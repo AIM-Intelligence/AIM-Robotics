@@ -15,7 +15,7 @@ import struct
 # ============================================================
 # Configuration
 # ============================================================
-MAC_IP = "10.40.100.105"  # Mac receiver IP
+MAC_IP = "192.168.123.99"  # Mac receiver IP
 RGB_PORT = 8889      # RGB stream port
 DEPTH_PORT = 8890    # Depth stream port
 CHUNK_SIZE = 60000   # 60KB chunks (safe for UDP)

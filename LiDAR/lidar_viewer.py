@@ -19,14 +19,6 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((UDP_IP, UDP_PORT))
 sock.setblocking(False)  # Non-blocking mode
 
-# 좌표 변환 설정 (LiDAR 거꾸로 장착 보정)
-# 180도 회전이면 보통 두 축을 뒤집어야 합니다
-# 아래 조합들을 시도해보세요:
-# 1) X=False, Y=False, Z=True  (Z축만)
-# 2) X=False, Y=True,  Z=True  (Y, Z 반전 - X축 기준 180도 회전)
-# 3) X=True,  Y=False, Z=True  (X, Z 반전 - Y축 기준 180도 회전)
-# 4) X=True,  Y=True,  Z=False (X, Y 반전 - Z축 기준 180도 회전)
-
 FLIP_X = False  # X축 반전 여부
 FLIP_Y = True   # Y축 반전 여부
 FLIP_Z = True   # Z축 반전 여부
@@ -49,22 +41,27 @@ ax = fig.add_subplot(111, projection='3d')
 ax.set_xlabel('X (m)')
 ax.set_ylabel('Y (m)')
 ax.set_zlabel('Z (m)')
-flip_status = f"FLIP_X={FLIP_X}, FLIP_Y={FLIP_Y}, FLIP_Z={FLIP_Z}"
-ax.set_title(f'G1 LiDAR - 실시간 포인트 클라우드 (거리 기반 색상)\n{flip_status}')
+ax.set_title('G1 LiDAR - Real-time Point Cloud')
 
-# 축 범위 설정 (실내 환경에 맞게)
+# 축 범위 설정
 ax.set_xlim([-3, 3])
 ax.set_ylim([-3, 3])
-ax.set_zlim([-1, 2])
+ax.set_zlim([0, 3])  # 바닥을 0으로
 
 scatter = ax.scatter([], [], [], c='b', marker='.', s=1)
+
+# LiDAR 위치 마커 (원점에 빨간 점)
+lidar_marker = ax.scatter([0], [0], [0], c='red', marker='o', s=50, label='LiDAR')
+ax.legend(loc='upper right')
 
 frame_count = 0
 packet_count = 0
 total_points_received = 0
+estimated_height = None  # 추정된 LiDAR 높이
+ground_z_offset = 0.0    # 바닥을 z=0으로 만들기 위한 오프셋
 
 def update_plot(frame):
-    global points_buffer, frame_count, packet_count, total_points_received
+    global points_buffer, frame_count, packet_count, total_points_received, estimated_height, ground_z_offset
 
     # UDP로 데이터 수신 (non-blocking)
     packets_this_frame = 0
@@ -103,18 +100,18 @@ def update_plot(frame):
             # 더 이상 읽을 데이터가 없음
             break
         except Exception as e:
-            print(f"오류: {e}")
+            print(f"Error: {e}")
             break
 
     # 주기적으로 버퍼 완전히 비우기 (깨끗한 현재 뷰)
     if frame_count % clear_interval == 0 and frame_count > 0:
-        print(f"[프레임 {frame_count}] 버퍼 초기화 - 새로운 스캔 시작")
+        print(f"[Frame {frame_count}] Buffer cleared - new scan started")
         points_buffer.clear()
 
     # 디버그 출력
     if packets_this_frame > 0:
-        print(f"업데이트 #{frame_count}: {packets_this_frame} 패킷, {points_this_frame} 포인트 수신, "
-              f"버퍼: {len(points_buffer)} 포인트")
+        print(f"Update #{frame_count}: {packets_this_frame} packets, {points_this_frame} points, "
+              f"buffer: {len(points_buffer)} points")
 
     # 너무 많은 포인트가 쌓이면 오래된 것 제거
     if len(points_buffer) > max_points:
@@ -123,6 +120,28 @@ def update_plot(frame):
     # 포인트가 있으면 시각화
     if len(points_buffer) > 0:
         points = np.array(points_buffer)
+
+        # 바닥 높이 자동 추정 및 보정 (충분한 데이터가 있을 때)
+        if len(points) > 100 and frame_count % 30 == 0:  # 30프레임마다 업데이트
+            # Z 좌표 하위 10%를 바닥으로 간주
+            z_coords = points[:, 2]
+            ground_threshold = np.percentile(z_coords, 10)
+            ground_points = points[z_coords <= ground_threshold]
+
+            if len(ground_points) > 10:
+                # 바닥의 평균 Z 좌표
+                ground_z = np.mean(ground_points[:, 2])
+                # 바닥을 z=0으로 만들기 위한 오프셋
+                ground_z_offset = -ground_z
+                # LiDAR 높이 = 오프셋 (바닥에서 LiDAR까지)
+                estimated_height = ground_z_offset
+
+        # 모든 포인트에 오프셋 적용 (바닥을 z=0으로)
+        if ground_z_offset != 0:
+            points[:, 2] += ground_z_offset
+
+            # LiDAR 마커 위치 업데이트
+            lidar_marker._offsets3d = ([0], [0], [estimated_height])
 
         # 다운샘플링 (vibes 코드 방식 - 성능 향상)
         if len(points) > 100000:
@@ -141,17 +160,18 @@ def update_plot(frame):
         if frame_count % 10 == 0:
             filtered_count = len(points_buffer)
             displayed_count = len(points)
-            title = f'G1 LiDAR - {filtered_count} 포인트 (표시: {displayed_count})\n{flip_status}'
+            height_text = f" | Height: {estimated_height:.2f}m" if estimated_height else ""
+            title = f'G1 LiDAR - {displayed_count} points{height_text}'
             ax.set_title(title)
 
     frame_count += 1
     return scatter,
 
-print("G1 LiDAR 실시간 뷰어")
-print(f"UDP 수신 대기: {UDP_IP}:{UDP_PORT}")
-print("스트리밍 프로그램을 실행하세요:")
-print("  ./build/g1_lidar_stream g1_mid360_config.json")
-print("\n뷰어를 종료하려면 창을 닫으세요\n")
+print("G1 LiDAR Real-time Viewer")
+print(f"Listening on UDP: {UDP_IP}:{UDP_PORT}")
+print("Start streaming program:")
+print("  ./build/g1_lidar_stream g1_mid360_config.json <Mac_IP> 8888")
+print("\nClose window to exit\n")
 
 # 애니메이션 시작 (50ms 간격 = 20 FPS)
 ani = animation.FuncAnimation(fig, update_plot, interval=50, blit=False)

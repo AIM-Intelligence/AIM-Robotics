@@ -6,6 +6,8 @@
 #include <sys/socket.h>
 #include <string.h>
 #include <iostream>
+#include <chrono>
+#include <sys/time.h>
 
 // UDP 설정
 int udp_socket;
@@ -20,10 +22,18 @@ struct __attribute__((packed)) SimplePoint {
 void PointCloudCallback(uint32_t handle, const uint8_t dev_type,
                         LivoxLidarEthernetPacket* data, void* client_data) {
     static int count = 0;
+    static auto last_callback_time = std::chrono::high_resolution_clock::now();
+    static long long total_processing_us = 0;
+    static long long total_send_us = 0;
+
+    auto callback_start = std::chrono::high_resolution_clock::now();
+
     if (data == nullptr) return;
 
     // Cartesian 좌표계 데이터만 처리
     if (data->data_type == kLivoxLidarCartesianCoordinateHighData) {
+        auto processing_start = std::chrono::high_resolution_clock::now();
+
         LivoxLidarCartesianHighRawPoint *points =
             (LivoxLidarCartesianHighRawPoint *)data->data;
 
@@ -42,13 +52,31 @@ void PointCloudCallback(uint32_t handle, const uint8_t dev_type,
             }
         }
 
+        auto processing_end = std::chrono::high_resolution_clock::now();
+        auto processing_us = std::chrono::duration_cast<std::chrono::microseconds>(processing_end - processing_start).count();
+
         // 유효한 포인트가 있으면 전송
         if (valid_count > 0) {
+            auto send_start = std::chrono::high_resolution_clock::now();
             int sent = sendto(udp_socket, buffer, valid_count * sizeof(SimplePoint), 0,
                    (struct sockaddr*)&viewer_addr, sizeof(viewer_addr));
+            auto send_end = std::chrono::high_resolution_clock::now();
+            auto send_us = std::chrono::duration_cast<std::chrono::microseconds>(send_end - send_start).count();
+
+            total_processing_us += processing_us;
+            total_send_us += send_us;
+
             if (++count % 100 == 0) {
+                auto callback_interval = std::chrono::duration_cast<std::chrono::milliseconds>(callback_start - last_callback_time).count();
                 printf("전송 #%d: %d 포인트, %d 바이트 (전체 %d 포인트)\n",
                        count, valid_count, sent, data->dot_num);
+                printf("  [타이밍] 처리: %.2f us, 전송: %.2f us, 콜백 간격: %lld ms\n",
+                       total_processing_us / 100.0, total_send_us / 100.0, callback_interval);
+                printf("  [평균] 처리: %.2f us/패킷, 전송: %.2f us/패킷\n\n",
+                       total_processing_us / 100.0, total_send_us / 100.0);
+                total_processing_us = 0;
+                total_send_us = 0;
+                last_callback_time = callback_start;
             }
         }
     }

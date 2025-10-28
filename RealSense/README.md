@@ -2,14 +2,24 @@
 
 Unitree G1 (Jetson Orin NX)에서 실시간 RGB-D 카메라 스트리밍
 
-**RGB 스트림:**
+<table>
+<tr>
+<td width="50%">
+
+**RGB 스트림**
 
 ![RGB Stream](RGB.png)
 
-**Depth 스트림 (컬러맵):**
+</td>
+<td width="50%">
+
+**Depth 스트림 (컬러맵)**
 
 ![Depth Stream](Depth.png)
 
+</td>
+</tr>
+</table>
 
 ## 📋 프로젝트 목표
 

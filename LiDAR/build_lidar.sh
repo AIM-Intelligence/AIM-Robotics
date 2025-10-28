@@ -1,29 +1,29 @@
 #!/bin/bash
-# G1 LiDAR 예제 빌드 스크립트
+# G1 LiDAR build script
 
-echo "G1 LiDAR 예제 빌드 중..."
+echo "Building G1 LiDAR example..."
 
-# 빌드 디렉토리 생성
+# Create build directory
 mkdir -p build
 cd build
 
-# CMake 실행
+# Run CMake
 cmake ..
 
-# 컴파일
+# Compile
 make
 
 if [ $? -eq 0 ]; then
     echo ""
-    echo "✓ 빌드 성공!"
+    echo "✓ Build successful!"
     echo ""
-    echo "실행 방법:"
-    echo "  ./build/g1_lidar_stream g1_mid360_config.json <맥_IP> <포트>"
+    echo "Usage:"
+    echo "  ./build/g1_lidar_stream g1_mid360_config.json <VIEWER_IP> <PORT>"
     echo ""
-    echo "예시:"
+    echo "Example:"
     echo "  ./build/g1_lidar_stream g1_mid360_config.json 10.40.100.105 8888"
 else
     echo ""
-    echo "✗ 빌드 실패"
+    echo "✗ Build failed"
     exit 1
 fi

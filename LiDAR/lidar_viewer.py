@@ -1,89 +1,70 @@
 #!/usr/bin/env python3
 """
-G1 LiDAR 실시간 3D 뷰어
+G1 LiDAR Real-time 3D Viewer - Open3D GUI
 """
 import socket
 import struct
 import numpy as np
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-import matplotlib.animation as animation
-import select
+import open3d as o3d
+from open3d.visualization import gui, rendering
+import threading
+import time
+from matplotlib import cm
 
-# UDP 설정
+# ============================================
+# Configuration
+# ============================================
+
+# UDP settings
 UDP_IP = "0.0.0.0"
 UDP_PORT = 8888
 
-# 소켓 생성 (non-blocking)
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.bind((UDP_IP, UDP_PORT))
-sock.setblocking(False)  # Non-blocking mode
+# Coordinate transformation
+FLIP_X = False
+FLIP_Y = True
+FLIP_Z = True
 
-FLIP_X = False  # X축 반전 여부
-FLIP_Y = True   # Y축 반전 여부
-FLIP_Z = True   # Z축 반전 여부
+# Distance filtering
+MAX_RANGE = 15.0  # meters
+MIN_RANGE = 0.1   # meters
 
-# 포인트 클라우드 버퍼
-# 로봇이 멈춰있으면 계속 쌓아서 더 완전한 뷰 제공
-points_buffer = []  # 모든 최근 포인트 저장
-max_points = 30000  # 최대 30,000 포인트 유지 (약 1.5초 분량)
-clear_interval = 200 # 200 프레임마다만 초기화 (약 10초 - 거의 안 지움)
+# ============================================
+# Global Variables
+# ============================================
+points_xyz = []
+points_lock = threading.Lock()
+running = True
 
-# 필터링 설정
-MAX_RANGE = 10.0    # 최대 거리 (m) - 이것보다 먼 포인트는 노이즈로 간주
-MIN_RANGE = 0.1     # 최소 거리 (m) - 센서 너무 가까운 포인트 제거
+# Color Lookup Table (pre-computed for speed)
+COLORMAP_SIZE = 256
+COLORMAP_LUT = cm.jet(np.linspace(0, 1, COLORMAP_SIZE))[:, :3]
 
-# Figure 설정
-fig = plt.figure(figsize=(12, 9))
-ax = fig.add_subplot(111, projection='3d')
 
-# 초기 설정
-ax.set_xlabel('X (m)')
-ax.set_ylabel('Y (m)')
-ax.set_zlabel('Z (m)')
-ax.set_title('G1 LiDAR - Real-time Point Cloud')
+def udp_receiver():
+    """
+    UDP receiver thread - optimized version
+    Receives point cloud data and buffers them
+    """
+    global points_xyz, running
 
-# 축 범위 설정
-ax.set_xlim([-3, 3])
-ax.set_ylim([-3, 3])
-ax.set_zlim([0, 3])  # 바닥을 0으로
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.bind((UDP_IP, UDP_PORT))
+    sock.setblocking(False)
 
-scatter = ax.scatter([], [], [], c='b', marker='.', s=1)
+    print(f"UDP listening on {UDP_IP}:{UDP_PORT}")
 
-# LiDAR 위치 마커 (원점에 빨간 점)
-lidar_marker = ax.scatter([0], [0], [0], c='red', marker='o', s=50, label='LiDAR')
-ax.legend(loc='upper right')
+    local_buffer = []
 
-frame_count = 0
-packet_count = 0
-total_points_received = 0
-estimated_height = None  # 추정된 LiDAR 높이
-ground_z_offset = 0.0    # 바닥을 z=0으로 만들기 위한 오프셋
-
-def update_plot(frame):
-    global points_buffer, frame_count, packet_count, total_points_received, estimated_height, ground_z_offset
-
-    # UDP로 데이터 수신 (non-blocking)
-    packets_this_frame = 0
-    points_this_frame = 0
-
-    while True:
+    while running:
         try:
             data, addr = sock.recvfrom(65536)
-            packets_this_frame += 1
-            packet_count += 1
-
-            # 포인트 파싱 (각 포인트: 3 floats + 1 byte = 13 bytes)
             num_points = len(data) // 13
-            points_this_frame += num_points
-            total_points_received += num_points
 
             for i in range(num_points):
                 offset = i * 13
                 x, y, z = struct.unpack('fff', data[offset:offset+12])
-                intensity = struct.unpack('B', data[offset+12:offset+13])[0]
 
-                # LiDAR 거꾸로 장착 보정 (X축 기준 180도 회전)
+                # Apply coordinate transformation
                 if FLIP_X:
                     x = -x
                 if FLIP_Y:
@@ -91,89 +72,206 @@ def update_plot(frame):
                 if FLIP_Z:
                     z = -z
 
-                # 거리 필터링 (노이즈 제거)
+                # Distance filtering (remove noise)
                 distance = np.sqrt(x*x + y*y + z*z)
                 if MIN_RANGE < distance < MAX_RANGE:
-                    points_buffer.append([x, y, z, intensity])
+                    local_buffer.append([x, y, z])
+
+            # Periodically copy to main buffer
+            if len(local_buffer) > 1000:
+                with points_lock:
+                    points_xyz.extend(local_buffer)
+                    # Limit buffer size
+                    if len(points_xyz) > 70000:
+                        points_xyz = points_xyz[-50000:]
+                local_buffer.clear()
 
         except BlockingIOError:
-            # 더 이상 읽을 데이터가 없음
-            break
+            time.sleep(0.001)
         except Exception as e:
-            print(f"Error: {e}")
+            if running:
+                print(f"❌ Error: {e}")
             break
 
-    # 주기적으로 버퍼 완전히 비우기 (깨끗한 현재 뷰)
-    if frame_count % clear_interval == 0 and frame_count > 0:
-        print(f"[Frame {frame_count}] Buffer cleared - new scan started")
-        points_buffer.clear()
+    sock.close()
 
-    # 디버그 출력
-    if packets_this_frame > 0:
-        print(f"Update #{frame_count}: {packets_this_frame} packets, {points_this_frame} points, "
-              f"buffer: {len(points_buffer)} points")
 
-    # 너무 많은 포인트가 쌓이면 오래된 것 제거
-    if len(points_buffer) > max_points:
-        points_buffer = points_buffer[-max_points:]
+class LiDARWindow:
+    """
+    Main window class for LiDAR visualization
+    Uses Open3D GUI for Rhino-style camera controls
+    """
 
-    # 포인트가 있으면 시각화
-    if len(points_buffer) > 0:
-        points = np.array(points_buffer)
+    def __init__(self):
+        self.app = gui.Application.instance
+        self.app.initialize()
 
-        # 바닥 높이 자동 추정 및 보정 (충분한 데이터가 있을 때)
-        if len(points) > 100 and frame_count % 30 == 0:  # 30프레임마다 업데이트
-            # Z 좌표 하위 10%를 바닥으로 간주
-            z_coords = points[:, 2]
-            ground_threshold = np.percentile(z_coords, 10)
-            ground_points = points[z_coords <= ground_threshold]
+        # Create window
+        self.window = self.app.create_window("G1 LiDAR - Rhino Style", 1280, 720)
 
-            if len(ground_points) > 10:
-                # 바닥의 평균 Z 좌표
-                ground_z = np.mean(ground_points[:, 2])
-                # 바닥을 z=0으로 만들기 위한 오프셋
-                ground_z_offset = -ground_z
-                # LiDAR 높이 = 오프셋 (바닥에서 LiDAR까지)
-                estimated_height = ground_z_offset
+        # Create SceneWidget (provides automatic orbit/pan/zoom controls)
+        self.scene = gui.SceneWidget()
+        self.scene.scene = rendering.Open3DScene(self.window.renderer)
+        self.window.add_child(self.scene)
 
-        # 모든 포인트에 오프셋 적용 (바닥을 z=0으로)
-        if ground_z_offset != 0:
-            points[:, 2] += ground_z_offset
+        # Prepare point cloud
+        self.pcd = o3d.geometry.PointCloud()
+        self.mat = rendering.MaterialRecord()
+        self.mat.shader = "defaultUnlit"
+        self.mat.point_size = 2.0
 
-            # LiDAR 마커 위치 업데이트
-            lidar_marker._offsets3d = ([0], [0], [estimated_height])
+        # Add coordinate frame at origin
+        self.coord_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.5)
+        coord_mat = rendering.MaterialRecord()
+        coord_mat.shader = "defaultUnlit"
 
-        # 다운샘플링 (vibes 코드 방식 - 성능 향상)
-        if len(points) > 100000:
-            step = len(points) // 100000
-            points = points[::step]
+        # Add to scene
+        self.scene.scene.add_geometry("pcd", self.pcd, self.mat)
+        self.scene.scene.add_geometry("coord", self.coord_frame, coord_mat)
 
-        # 색상은 거리 기반
-        distances = np.sqrt(points[:, 0]**2 + points[:, 1]**2 + points[:, 2]**2)
-        colors = distances  # 거리 값 그대로 사용 (matplotlib이 자동 정규화)
+        # Initial camera setup
+        bbox = o3d.geometry.AxisAlignedBoundingBox([-3, -3, 0], [3, 3, 3])
+        self.scene.setup_camera(60.0, bbox, [0, 0, 0.5])
 
-        # Scatter plot 업데이트
-        scatter._offsets3d = (points[:, 0], points[:, 1], points[:, 2])
-        scatter.set_array(colors)
-        scatter.set_cmap('jet')  # jet: 파란색(가까움) -> 빨간색(멀음)
+        # Background color (dark gray)
+        self.scene.scene.set_background([0.05, 0.05, 0.05, 1.0])
 
-        if frame_count % 10 == 0:
-            filtered_count = len(points_buffer)
-            displayed_count = len(points)
-            height_text = f" | Height: {estimated_height:.2f}m" if estimated_height else ""
-            title = f'G1 LiDAR - {displayed_count} points{height_text}'
-            ax.set_title(title)
+        # Register keyboard events
+        self.window.set_on_key(self.on_key)
 
-    frame_count += 1
-    return scatter,
+        # Timer variables
+        self.frame_count = 0
+        self.last_fps_time = time.time()
+        self.update_interval = 0.05  # 50ms = 20 FPS
 
-print("G1 LiDAR Real-time Viewer")
-print(f"Listening on UDP: {UDP_IP}:{UDP_PORT}")
-print("Start streaming program:")
-print("  ./build/g1_lidar_stream g1_mid360_config.json <Mac_IP> 8888")
-print("\nClose window to exit\n")
+        # Print usage information
+        print("\n" + "="*60)
+        print("G1 LiDAR Viewer")
+        print("="*60)
+        print("\nCamera Controls:")
+        print("  Mouse Drag           → Orbit (rotate around center)")
+        print("  Shift + Drag         → Pan (move look-at point)")
+        print("  Mouse Wheel          → Zoom in/out")
+        print("  Double Click         → Set rotation center")
+        print("  R                    → Reset camera")
+        print("  Q                    → Quit")
+        print(f"\nPerformance:")
+        print(f"  Range: {MIN_RANGE}-{MAX_RANGE}m")
+        print("="*60 + "\n")
+        print("Waiting for data...\n")
 
-# 애니메이션 시작 (50ms 간격 = 20 FPS)
-ani = animation.FuncAnimation(fig, update_plot, interval=50, blit=False)
+        # Start update loop
+        self.schedule_update()
 
-plt.show()
+    def on_key(self, e):
+        """Handle keyboard events"""
+        # R: Reset camera
+        if e.key == gui.KeyName.R and e.type == gui.KeyEvent.DOWN:
+            with points_lock:
+                if len(points_xyz) > 0:
+                    arr = np.array(points_xyz)
+                    bbox = o3d.geometry.AxisAlignedBoundingBox(
+                        arr.min(axis=0), arr.max(axis=0)
+                    )
+                    center = bbox.get_center()
+                else:
+                    bbox = o3d.geometry.AxisAlignedBoundingBox([-3, -3, 0], [3, 3, 3])
+                    center = [0, 0, 0.5]
+
+            self.scene.setup_camera(60.0, bbox, center)
+            print("✓ Camera reset")
+            return True
+
+        # Q: Quit application
+        if e.key == gui.KeyName.Q and e.type == gui.KeyEvent.DOWN:
+            global running
+            running = False
+            self.app.quit()
+            return True
+
+        return False
+
+    def update_geometry(self):
+        """
+        Update point cloud geometry
+        Returns True if updated successfully, False otherwise
+        """
+        # Copy points from buffer
+        with points_lock:
+            if len(points_xyz) == 0:
+                return False
+            arr = np.array(points_xyz, dtype=np.float32)
+
+        # Calculate colors using LUT (optimized)
+        distances = np.linalg.norm(arr, axis=1)
+        d_min, d_max = distances.min(), distances.max()
+        if d_max > d_min:
+            normalized = (distances - d_min) / (d_max - d_min)
+        else:
+            normalized = np.zeros_like(distances)
+
+        # Use Lookup Table
+        indices = (normalized * 255).astype(np.uint8)
+        colors = COLORMAP_LUT[indices]
+
+        # Update point cloud
+        self.pcd.points = o3d.utility.Vector3dVector(arr)
+        self.pcd.colors = o3d.utility.Vector3dVector(colors)
+
+        # Update scene
+        self.scene.scene.remove_geometry("pcd")
+        self.scene.scene.add_geometry("pcd", self.pcd, self.mat)
+
+        # Print FPS every 100 frames
+        self.frame_count += 1
+        if self.frame_count % 100 == 0:
+            current_time = time.time()
+            elapsed = current_time - self.last_fps_time
+            fps = 100 / elapsed
+            print(f"✓ Frame {self.frame_count}: {len(arr):,} points | {fps:.1f} FPS")
+            self.last_fps_time = current_time
+
+        return True
+
+    def schedule_update(self):
+        """Schedule next geometry update"""
+        if not running:
+            return
+
+        # Update geometry
+        self.update_geometry()
+
+        # Schedule next update
+        gui.Application.instance.post_to_main_thread(
+            self.window,
+            lambda: self.schedule_update() if running else None
+        )
+ 
+    def run(self):
+        """Run the main application loop"""
+        self.app.run()
+
+
+def main():
+    """Main entry point"""
+    # Start UDP receiver thread
+    receiver = threading.Thread(target=udp_receiver, daemon=True)
+    receiver.start()
+
+    # Run GUI
+    try:
+        window = LiDARWindow()
+        window.run()
+    except Exception as e:
+        print(f"\n❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        global running
+        running = False
+        receiver.join(timeout=1.0)
+        print("\nViewer closed")
+
+
+if __name__ == "__main__":
+    main()

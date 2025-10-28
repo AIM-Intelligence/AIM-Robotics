@@ -1,0 +1,18 @@
+# AIM Robotics - Python Dependencies
+# Project: Unitree G1 Humanoid Robot Development
+
+# ============================================
+# LiDAR Visualization (LiDAR/)
+# ============================================
+open3d>=0.17.0        # 3D visualization and point cloud processing
+numpy>=1.21.0         # Numerical computing
+matplotlib>=3.5.0     # Color mapping for point cloud visualization
+
+# ============================================
+# Installation Instructions
+# ============================================
+# Install all dependencies:
+#   pip3 install -r requirements.txt
+#
+# Or install specific project dependencies:
+#   pip3 install open3d numpy matplotlib

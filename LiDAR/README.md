@@ -113,23 +113,6 @@ LiDAR/
 └────────────────────────────────────────────────┘
 ```
 
-**Important: Updating Jetson IP**
-
-If your Jetson's IP address changes, update `g1_mid360_config.json`:
-
-```json
-{
-  "MID360": {
-    "host_net_info": [
-      {
-        "host_ip": "192.168.123.164",  // ← Change this to your Jetson's LiDAR interface IP
-        ...
-      }
-    ]
-  }
-}
-```
-
 ---
 
 ## 🔨 Build Instructions

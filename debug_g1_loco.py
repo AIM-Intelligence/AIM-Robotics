@@ -111,25 +111,21 @@ def main():
 
     # Now test move commands
     try:
-        print("\nTest 1: Move forward 0.2 m/s for 3 seconds")
-        client.Move(0.1, 0, 0)
-        time.sleep(3)
-
-        print("\nTest 2: Stop")
+        # 전진 0.20 m/s로 3초
+        client.Move(1, 0.00, 0.00)
         client.StopMove()
-        time.sleep(1)
+        time.sleep(0.5)
 
-        print("\nTest 3: Move backward 0.15 m/s for 2 seconds")
-        client.Move(-3, 0, 0)
-        time.sleep(2)
-
-        print("\nTest 4: Stop")
+        # # 후진 0.15 m/s로 2초
+        client.Move(1, 0.00, 0.00)
+        time.sleep(0.5)
         client.StopMove()
-        time.sleep(1)
+        time.sleep(0.5)
 
-        print("\nTest 5: Rotate 0.3 rad/s for 2 seconds")
-        client.Move(0, 0, 0.3)
-        time.sleep(2)
+        # 제자리 회전 0.30 rad/s로 2초 (반시계+)
+        client.Move(0.00, 0.00, 0.30)
+        time.sleep(2.0)
+        client.StopMove()
 
         print("\nFinal: Stop")
         client.StopMove()

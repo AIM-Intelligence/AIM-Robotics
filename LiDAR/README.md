@@ -78,7 +78,7 @@ LiDAR/
 | File | Role |
 |------|------|
 | `g1_lidar_stream.cpp` | Receives LiDAR data via Livox SDK, sends via UDP |
-| `lidar_viewer.py` | 3D visualization with Open3D GUI (Rhino-style controls) |
+| `lidar_viewer.py` | 3D visualization with Open3D GUI |
 | `g1_mid360_config.json` | LiDAR network settings (IP, ports) |
 | `CMakeLists.txt` | Build configuration (libraries, compiler options) |
 | `build_lidar.sh` | Build automation (cmake + make) |

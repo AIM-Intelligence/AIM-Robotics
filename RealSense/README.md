@@ -35,11 +35,11 @@ LiDAR 뷰어와 동일한 패턴: 빠른 프로토타이핑을 위한 간단한 
 ```
 RealSense/
 ├── examples/
-│   ├── 00_check_camera.py       ✅ 카메라 감지 및 확인
-│   ├── 01_basic_capture.py      ✅ 로컬 테스트 (프레임 캡처 + 분석)
-│   ├── 02_stream_sender.py      ✅ Jetson → Mac 송신 (압축 + 패킷 분할)
-│   └── 03_stream_receiver.py    ✅ Mac 수신 및 표시
-└── README.md                    📝 이 파일
+│   ├── 00_check_camera.py       # 카메라 감지 및 확인
+│   ├── 01_basic_capture.py      # 로컬 테스트 (프레임 캡처 + 분석)
+│   ├── 02_stream_sender.py      # Jetson → Mac 송신 (압축 + 패킷 분할)
+│   └── 03_stream_receiver.py    # Mac 수신 및 표시
+└── README.md
 ```
 
 ---
@@ -51,37 +51,35 @@ RealSense/
 │ Jetson (로봇)                                                 │
 │                                                              │
 │  RealSense D435i                                             │
-│     ├─ RGB (640x480 BGR)  ──┐                               │
-│     └─ Depth (640x480 mm)   │                               │
+│     ├─ RGB (640x480 BGR)  ──┐                                │
+│     └─ Depth (640x480 mm)   │                                │
 │                             ▼                                │
 │  02_stream_sender.py                                         │
-│     ├─ JPEG 압축 (RGB: 900KB → 22KB)                         │
-│     ├─ PNG 압축 (Depth: 600KB → 190KB)                       │
-│     ├─ 패킷 분할 (60KB 청크)                                  │
+│     ├─ JPEG 압축 (RGB: 900KB → 22KB)                          │
+│     ├─ PNG 압축 (Depth: 600KB → 190KB)                        │
+│     ├─ 패킷 분할 (60KB 청크)                                    │
 │     └─ UDP socket ────────────────────────────────────────┐  │
-└──────────────────────────────────────────────────────────────┘  │
-                                                                 │
-                                                                 │ UDP 8889 (RGB)
-                                                                 │ UDP 8890 (Depth)
-                                                                 │
-┌──────────────────────────────────────────────────────────────┐  │
-│ Mac (지상국)                                                  │  │
-│                                                              │  │
-│  03_stream_receiver.py                                       │  │
-│     ├─ UDP socket ◄──────────────────────────────────────────┘
-│     ├─ 패킷 재조립
-│     ├─ JPEG/PNG 디코딩
-│     └─ OpenCV 표시
-│         ├─ RGB 창
-│         └─ Depth (컬러맵) 창
+└──────────────────────────────────────────────────────────────┘
+                                                            │
+                                                            │ UDP 8889 (RGB)
+                                                            │ UDP 8890 (Depth)
+                                                            │
+┌──────────────────────────────────────────────────────────────┐
+│ Mac (지상국)                                                │  │
+│                                                           │  │
+│  03_stream_receiver.py                                    │  │
+│     ├─ UDP socket ◄───────────────────────────────────────┘  │
+│     ├─ 패킷 재조립                                              │
+│     ├─ JPEG/PNG 디코딩                                         │
+│     └─ OpenCV 표시                                            │
+│         ├─ RGB 창                                            │
+│         └─ Depth (컬러맵) 창                                   │
 └──────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 📝 구현 단계
-
-### ✅ Phase 1: 로컬 테스트 (완료)
+### ✅ Phase 1: 로컬 테스트
 
 **00_check_camera.py**
 - RealSense 디바이스 감지
@@ -99,7 +97,7 @@ RealSense/
 
 ---
 
-### ✅ Phase 2: 네트워크 스트리밍 (완료)
+### ✅ Phase 2: 네트워크 스트리밍
 
 **02_stream_sender.py** (Jetson)
 - RealSense 초기화 및 30프레임 안정화
@@ -117,9 +115,9 @@ RealSense/
 - FPS 및 depth 통계 overlay
 
 **핵심 기술:**
-- ✅ 압축으로 대역폭 97% 감소 (900KB → 22KB)
-- ✅ 패킷 분할로 UDP 크기 제한 해결
-- ✅ 무손실 depth 전송 (PNG 16-bit)
+- 압축으로 대역폭 97% 감소 (900KB → 22KB)
+- 패킷 분할로 UDP 크기 제한 해결
+- 무손실 depth 전송 (PNG 16-bit)
 
 ---
 
@@ -131,7 +129,6 @@ RealSense/
 
 **librealsense 빌드:**
 ```bash
-# 저장소 클론
 git clone https://github.com/IntelRealSense/librealsense.git
 cd ~/librealsense
 
@@ -180,7 +177,7 @@ python3 02_stream_sender.py
 **참고:** `MAC_IP` 변수를 Mac의 **유선 IP**로 설정하세요!
 ```python
 # 02_stream_sender.py
-MAC_IP = "10.40.100.105"  # Mac 유선 IP
+MAC_IP = "192.168.123.99"  # Mac 유선 IP
 ```
 
 **4. 수신 및 표시 (Mac):**
@@ -196,7 +193,7 @@ python3 03_stream_receiver.py
 
 ```python
 # 02_stream_sender.py
-MAC_IP = "10.40.100.105"  # Mac IP (유선 권장!)
+MAC_IP = "192.168.123.99"  # Mac IP (유선 권장!)
 RGB_PORT = 8889           # RGB 스트림 포트
 DEPTH_PORT = 8890         # Depth 스트림 포트
 CHUNK_SIZE = 60000        # 60KB 청크 (UDP 안전 크기)
@@ -230,21 +227,6 @@ depth_colormap = cv2.applyColorMap(depth_normalized, cv2.COLORMAP_JET)
 
 ---
 
-## 📊 vibes와 비교
-
-| 항목 | vibes | 우리 구현 |
-|------|-------|----------|
-| 인코딩 | H.264 (HW) | JPEG/PNG (SW) |
-| 프로토콜 | GStreamer/RTP | UDP + 패킷 분할 |
-| 복잡도 | 높음 | 중간 |
-| 대역폭 | 낮음 (4Mbps) | 중간 (~6Mbps) |
-| 구현 난이도 | 어려움 | 보통 |
-| Depth 품질 | - | 무손실 16-bit |
-
-**전략:** 간단한 UDP + 압축으로 시작 → 필요시 나중에 GStreamer 추가
-
----
-
 ## 📷 카메라 정보
 
 **감지된 디바이스:**
@@ -256,13 +238,13 @@ USB 타입:       3.2 (USB 3.1 포트)
 ```
 
 **사용 가능한 센서:**
-- ✅ Stereo Module (Depth 센서)
-- ✅ RGB Camera (컬러 이미지)
-- ✅ Motion Module (IMU - 자이로/가속도계)
+- Stereo Module (Depth 센서)
+- RGB Camera (컬러 이미지)
+- Motion Module (IMU - 자이로/가속도계)
 
 **테스트된 스트림:**
-- ✅ Depth: 640x480 @ 30fps (16-bit, 밀리미터)
-- ✅ Color: 640x480 @ 30fps (8-bit BGR)
+- Depth: 640x480 @ 30fps (16-bit, 밀리미터)
+- Color: 640x480 @ 30fps (8-bit BGR)
 
 ---
 
@@ -275,7 +257,7 @@ USB 타입:       3.2 (USB 3.1 포트)
 lsusb | grep -i intel
 # 결과: 8086:0b3a Intel Corp. 가 보여야 함
 
-# USB 3.0 포트 확인 (파란색 포트 사용)
+# USB 3.0 포트 확인
 # 카메라 접근 확인
 python3 00_check_camera.py
 ```
@@ -298,44 +280,27 @@ pkill -9 python3
 
 **원인:** Mac IP가 잘못되었거나 네트워크 연결 끊김
 
-**해결:**
-
 **Mac에서 IP 확인:**
 ```bash
 # 모든 네트워크 IP 확인
 ifconfig | grep "inet " | grep -v 127.0.0.1
 
 # 출력 예시:
-#   inet 10.0.0.2 netmask ...        <- WiFi (무선)
-#   inet 10.40.100.105 netmask ...   <- Ethernet (유선) ✅ 이거 사용!
-```
+#   inet 10.40.100.105 netmask ...   <- WiFi (무선)
+#   inet 192.168.123.99 netmask ...   <- Ethernet (유선) ✅ 이거 사용!
 
-**유선 IP 찾는 방법:**
-1. `ifconfig | grep "inet " | grep -v 127.0.0.1` 실행
-2. 여러 IP가 나오면:
-   - **유선 (Ethernet)**: 보통 `10.40.x.x` 또는 `192.168.x.x` 형식
-   - **무선 (WiFi)**: 보통 `10.0.x.x` 형식
-3. **System Preferences → Network**에서 Ethernet IP 확인 (GUI 방법)
-
-**특정 인터페이스만 확인:**
-```bash
-ifconfig en0  # Ethernet (보통)
-ifconfig en1  # WiFi (보통)
 ```
 
 **02_stream_sender.py 수정:**
 ```python
-MAC_IP = "확인한_유선_IP"  # 예: "192.168.1.100"
+MAC_IP = "확인한_유선_IP"  # 예: "192.168.123.99"
 ```
 
 ### WiFi 과부하로 연결 끊김
 
 **원인:** RGB + Depth = ~6 MB/s 지속 전송, WiFi는 간섭/레이턴시에 취약
 
-**✅ 해결: 유선 네트워크 사용 (강력 추천)**
-- 안정적인 대역폭
-- 낮은 레이턴시
-- 패킷 손실 최소화
+**해결: 유선 네트워크 사용**
 
 **대체 방법 (유선 불가능한 경우):**
 1. **프레임률 낮추기:**
@@ -365,22 +330,6 @@ echo "test" | nc -u 10.40.100.105 8889
 
 ---
 
-## 🎯 개발 체크리스트
-
-- [x] 카메라 감지 스크립트 (00_check_camera.py)
-- [x] USB 3.2 연결 확인
-- [x] 프로젝트 구조 구성
-- [x] 01_basic_capture.py 작성 및 테스트
-- [x] 로컬 프레임 캡처 및 분석
-- [x] JPEG/PNG 압축 구현
-- [x] 패킷 분할 전송 구현
-- [x] 02_stream_sender.py 작성
-- [x] 03_stream_receiver.py 작성
-- [x] 네트워크 스트리밍 테스트 (유선)
-- [x] 문서 작성 완료
-
----
-
 ## 📚 참고 자료
 
 **vibes 프로젝트:**
@@ -396,13 +345,14 @@ echo "test" | nc -u 10.40.100.105 8889
 
 ---
 
-## 💡 다음 단계 (선택)
+## 💡 TODO
 
-- [ ] H.264 하드웨어 인코딩 (대역폭 추가 감소)
-- [ ] GStreamer 통합 (낮은 지연시간)
+- [ ] H.264/H.265 코덱 도입 (WiFi 안정성 개선시 고려, 대역폭 6MB/s → 1-2MB/s)
+- [ ] GStreamer + NVENC 통합 (GPU 하드웨어 가속)
 - [ ] IMU 데이터 통합
-- [ ] Point cloud 생성 및 시각화
 - [ ] 여러 카메라 동시 지원
+
+**Note:** 현재 JPEG+PNG 방식으로 충분히 안정적. 코덱은 WiFi 끊김 문제 발생시에만 고려.
 
 ---
 

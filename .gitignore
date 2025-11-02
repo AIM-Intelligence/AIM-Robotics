@@ -41,3 +41,7 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.bak
+
+
+.env
+audio/

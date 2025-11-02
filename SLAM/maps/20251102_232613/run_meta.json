@@ -1,0 +1,28 @@
+{
+  "timestamp": "20251102_232613",
+  "args": {
+    "listen_ip": "0.0.0.0",
+    "listen_port": 9999,
+    "frame_rate": 20,
+    "min_range": 0.1,
+    "max_range": 20.0,
+    "self_filter_radius": 0.4,
+    "self_filter_z_min": -0.2,
+    "self_filter_z_max": 0.5,
+    "voxel_size": 0.5,
+    "min_points_per_frame": 800,
+    "preset": "indoor",
+    "no_save_map": false,
+    "output_dir": "/home/unitree/AIM-Robotics/SLAM/maps",
+    "run_name": null,
+    "no_session_folder": false,
+    "stream_enable": false,
+    "stream_port": 7609,
+    "stream_voxel": 0.05,
+    "stream_max_points": 60000,
+    "debug": false
+  },
+  "frames": 610,
+  "points": 3627149,
+  "distance_m": 13.13443143543895
+}

@@ -1,25 +1,35 @@
 # AIM-Robotics
 
-Unitree G1 로봇 개발 예제 및 유틸리티 모음
+Unitree G1 robot development examples and utilities
 
 ---
 
-## 📦 프로젝트 구조
+## Project Structure
 
 ```
 AIM-Robotics/
-├── LiDAR/              # Livox Mid-360 LiDAR 스트리밍 & 시각화
-├── debug_g1_loco.py    # G1 로봇 디버깅 유틸리티
-└── test.py             # 테스트 스크립트
+├── SLAM/               # LiDAR SLAM system (Livox Mid-360 + KISS-ICP)
+├── LiDAR/              # LiDAR streaming and visualization
+├── RealSense/          # Intel RealSense camera utilities
+├── audio/              # Audio recording and processing
+├── Light/              # LED control utilities
+├── debug_g1_loco.py    # Locomotion debugging utility
+└── debug_g1_arm.py     # Arm control debugging utility
 ```
 
 ---
 
-## 🚀 시작하기
+## Component Documentation
 
-### Prerequisites
+- **[SLAM](./SLAM/README.md)** - Complete LiDAR SLAM system with real-time mapping
+- **[LiDAR](./LiDAR/README.md)** - LiDAR streaming and 3D visualization
+- **[RealSense](./RealSense/README.md)** - RealSense camera integration (if available)
 
-**Unitree SDK2 Python 설치:**
+---
+
+## Prerequisites
+
+**Unitree SDK2 Python:**
 ```bash
 git clone https://github.com/unitreerobotics/unitree_sdk2_python.git
 cd unitree_sdk2_python
@@ -28,13 +38,7 @@ pip3 install -e .
 
 ---
 
-## 📂 프로젝트별 문서
-
-- **[LiDAR](./LiDAR/README.md)** - LiDAR 스트리밍 및 3D 시각화 가이드
-
----
-
-## 🛠️ 개발 환경
+## Development Environment
 
 - **Platform**: Unitree G1 (Jetson Orin NX)
 - **OS**: Ubuntu 20.04 (JetPack 5.x)

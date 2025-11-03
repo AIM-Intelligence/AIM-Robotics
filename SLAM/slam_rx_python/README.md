@@ -1,15 +1,14 @@
-# G1 Live SLAM
+# G1 Live SLAM 
 
-**모듈식 LiDAR SLAM 수신기 - C++ 최적화 버전**
+**모듈식 LiDAR SLAM 수신기 - Protocol  대응**
 
 ---
 
 ## 개요
 
-LiDAR Stream 프로토콜을 수신하여 KISS-ICP 기반 SLAM을 수행하는 시스템입니다.
+LiDAR Stream  프로토콜을 수신하여 KISS-ICP 기반 SLAM을 수행하는 새로운 시스템입니다.
 
-**주요 특징:**
-- ✅ **C++ 최적화 백엔드** (Protocol + Frame Builder)
+**주요 개선사항:**
 - ✅ 구조화된 패킷 헤더 파싱 (magic, timestamp, sequence, CRC)
 - ✅ 시간 기반 프레임 재구성 (device timestamp 사용)
 - ✅ 패킷 손실 검출 (sequence tracking)
@@ -24,17 +23,9 @@ LiDAR Stream 프로토콜을 수신하여 KISS-ICP 기반 SLAM을 수행하는 �
 ```
 /home/unitree/AIM-Robotics/SLAM/slam_rx/
 ├── live_slam.py           # 메인 엔트리포인트
-├── backend.py             # 백엔드 선택 (C++ 기본, Python fallback)
+├── lidar_protocol.py      # 패킷 파서/CRC 검증
+├── frame_builder.py       # 시간 기반 프레임 누적기
 ├── slam_pipeline.py       # KISS-ICP 래퍼
-├── cpp/                   # C++ 최적화 구현
-│   ├── include/
-│   │   ├── lidar_protocol_cpp.hpp
-│   │   └── frame_builder_cpp.hpp
-│   └── src/
-│       ├── lidar_protocol_cpp.cpp       # Protocol Parser (Phase 1)
-│       ├── lidar_protocol_pybind.cpp
-│       ├── frame_builder_cpp.cpp        # Frame Builder (Phase 2)
-│       └── frame_builder_pybind.cpp
 ├── tests/
 │   └── test_protocol.py   # 단위 테스트
 └── README.md              # 이 파일
@@ -58,40 +49,34 @@ cd /home/unitree/AIM-Robotics/SLAM/lidar_tx
 ./build/lidar_stream config.json 127.0.0.1 9999
 ```
 
-### 3. SLAM 수신기 시작 (C++ 백엔드 기본)
+### 3. SLAM 수신기 시작
 
 ```bash
 cd /home/unitree/AIM-Robotics/SLAM/slam_rx
-python3 live_slam.py --frame-rate 10 --max-range 15.0 --listen-port 9999
+python3 live_slam.py --frame-rate 20
 ```
-
-> **참고**: C++ 백엔드가 기본으로 사용됩니다. Python 테스트용: `SLAMRX_BACKEND=py python3 live_slam.py`
 
 ---
 
 ## 사용 예제
 
-### 기본 실행 (실내, 10Hz)
+### 기본 실행 (실내, 20Hz)
 
 ```bash
-python3 live_slam.py --frame-rate 10 --max-range 15.0 --listen-port 9999
+python3 live_slam_.py --frame-rate 20
 ```
 
 **기대 출력:**
 ```
-[BACKEND] ✓ Using C++ optimized backend
-[BACKEND]   - lidar_protocol_cpp (Phase 1)
-[BACKEND]   - frame_builder_cpp (Phase 2)
-
 ======================================================================
-G1 Live SLAM
+G1 Live SLAM 
 ======================================================================
-Frame rate:       10 Hz
-Range:            0.1 - 15.0 m
-Voxel size:       0.15 m
-Self-filter:      r=0.3m, z=±0.24m (symmetric)
+Frame rate:       20 Hz
+Range:            0.1 - 20.0 m
+Voxel size:       0.5 m
+Self-filter:      r=0.4m, z=[-0.2, 0.5]
 Min pts/frame:    800
-Preset:           indoor (ICP tuning applied)
+Preset:           indoor
 Debug:            False
 ======================================================================
 
@@ -112,17 +97,17 @@ Listening for LiDAR packets... (Ctrl+C to stop)
 ### 실외 SLAM (저속, 긴 범위)
 
 ```bash
-python3 live_slam.py \
+python3 live_slam_.py \
     --frame-rate 10 \
     --max-range 50.0 \
-    --preset outdoor \
-    --listen-port 9999
+    --voxel-size 1.0 \
+    --preset outdoor
 ```
 
 ### 디버그 모드 (패킷/프레임 상세 로그)
 
 ```bash
-python3 live_slam.py --frame-rate 10 --listen-port 9999 --debug
+python3 live_slam_.py --frame-rate 20 --debug
 ```
 
 **디버그 출력 예시:**
@@ -137,7 +122,7 @@ python3 live_slam.py --frame-rate 10 --listen-port 9999 --debug
 
 ```bash
 # 로봇 고정 후 실행
-python3 live_slam.py --frame-rate 10 --listen-port 9999
+python3 live_slam_.py --frame-rate 20
 
 # 30초 후 Ctrl+C
 ```
@@ -231,33 +216,6 @@ RESULTS: 6/6 passed, 0 failed
 
 ---
 
-## 성능 (C++ 최적화)
-
-**실측 결과** (Livox Mid-360, 2000 pps, 10 Hz):
-
-| 단계 | Python | C++ | 개선율 |
-|------|--------|-----|--------|
-| **Phase 1 (Protocol)** | 20.67 ms/frame | 7.68 ms/frame | **2.69x** |
-| **Phase 2 (Frame)** | 5.16 ms/frame | 3.25 ms/frame | **1.59x** |
-| **SLAM (KISS-ICP)** | 29.13 ms/frame | 29.13 ms/frame | 동일 (이미 C++) |
-| **전체** | **54.96 ms** | **40.06 ms** | **1.37x** |
-
-**핵심 효과:**
-- ✅ CPU 사용률 **~15% 감소** (로봇 다른 작업에 여유)
-- ✅ 전체 처리 시간 **27% 단축** (14.9ms 절감)
-- ✅ 배터리 수명 증가
-
-**백엔드 전환:**
-```bash
-# C++ 백엔드 (기본)
-python3 live_slam.py --frame-rate 10 --listen-port 9999
-
-# Python 백엔드 (테스트/디버깅용)
-SLAMRX_BACKEND=py python3 live_slam.py --frame-rate 10 --listen-port 9999
-```
-
----
-
 ## 성능 파라미터
 
 ### 프레임 레이트 조정
@@ -266,8 +224,8 @@ SLAMRX_BACKEND=py python3 live_slam.py --frame-rate 10 --listen-port 9999
 **해결:** 프레임 레이트를 낮춤
 
 ```bash
-# 10Hz → 5Hz
-python3 live_slam.py --frame-rate 5 --listen-port 9999
+# 20Hz → 15Hz 또는 10Hz
+python3 live_slam_.py --frame-rate 15
 ```
 
 ### 저포인트 프레임 스킵
@@ -276,7 +234,7 @@ python3 live_slam.py --frame-rate 5 --listen-port 9999
 **해결:** `--min-points-per-frame` 증가
 
 ```bash
-python3 live_slam.py --frame-rate 10 --min-points-per-frame 1200 --listen-port 9999
+python3 live_slam_.py --frame-rate 20 --min-points-per-frame 1200
 ```
 
 ---
@@ -341,10 +299,10 @@ cd /home/unitree/AIM-Robotics/SLAM/lidar_tx
 **해결:**
 ```bash
 # min_points_per_frame 낮춤
-python3 live_slam.py --min-points-per-frame 500 --listen-port 9999
+python3 live_slam_.py --min-points-per-frame 500
 
 # 또는 범위 확장
-python3 live_slam.py --max-range 30.0 --listen-port 9999
+python3 live_slam_.py --max-range 30.0
 ```
 
 ### 문제: "Sequence gaps"
@@ -359,38 +317,34 @@ python3 live_slam.py --max-range 30.0 --listen-port 9999
 
 ---
 
-## ZMQ 실시간 스트리밍
+## 다음 단계
 
-맥/원격 PC에서 실시간 맵 확인:
+### 뷰어 통합 (선택)
 
-```bash
-# Jetson (송신)
-python3 live_slam.py \
-    --frame-rate 10 \
-    --listen-port 9999 \
-    --stream-enable \
-    --stream-port 7609
-
-# Mac/PC (수신)
-python3 viewer_realtime_simple.py \
-    --server-ip 192.168.123.164 \
-    --port 7609 \
-    --flip-y --flip-z
+기존 뷰어 연동 시:
+```python
+# live_slam_.py에서 브로드캐스트 추가
+# (기존 live_slam.py의 broadcast_pose() 참고)
 ```
+
+### 성능 최적화
+
+- Cython 컴파일 (프로토콜 파서)
+- 멀티스레드 (UDP 수신 / SLAM 처리 분리)
+- GPU 가속 (Open3D CUDA 빌드)
 
 ---
 
-## 시스템 특징
+## 기존 시스템과 비교
 
-| 항목 | 설명 |
-|------|------|
-| 패킷 형식 | 27B header + points (magic, timestamp, sequence, CRC) |
-| 타임스탬프 | 장치 하드웨어 시간 (ns 정밀도) |
-| 프레임 재구성 | 시간 윈도우 기반 (10Hz = 0.1s periods) |
-| 손실 검출 | Sequence tracking |
-| CRC 검증 | IEEE 802.3 CRC32 |
-| 백엔드 | C++ (Protocol + Frame), Python fallback 지원 |
-| 구조 | 모듈식 (backend.py, slam_pipeline.py, cpp/) |
+| 항목 | Legacy (live_slam.py) |  (live_slam_.py) |
+|------|----------------------|---------------------|
+| 패킷 형식 | Raw 13B points | 27B header + points |
+| 타임스탬프 | 도착 시간 | 장치 하드웨어 시간 |
+| 프레임 재구성 | 고정 패킷 수 | 시간 윈도우 |
+| 손실 검출 | 불가능 | Sequence tracking |
+| CRC 검증 | 없음 | IEEE 802.3 |
+| 구조 | 단일 파일 | 모듈식 (4 파일) |
 
 ---
 

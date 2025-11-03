@@ -102,15 +102,15 @@ class FrameBuilder:
             self._start_new_frame(device_ts_ns, seq, debug)
 
         # Check if packet is late (timestamp earlier than current frame start)
-        if device_ts_ns < self.current_frame_start_ts:  # type: ignore[operator]
+        if device_ts_ns < self.current_frame_start_ts:
             self.stats.late_packets += 1
             if debug:
-                delta_ms = (self.current_frame_start_ts - device_ts_ns) / 1e6  # type: ignore[operator]
+                delta_ms = (self.current_frame_start_ts - device_ts_ns) / 1e6
                 print(f"[FRAME] ⚠ Late packet: seq={seq}, -{delta_ms:.1f}ms (discarded)")
             return None
 
         # Check if we need to close current frame
-        if device_ts_ns >= self.current_frame_start_ts + self.frame_period_ns:  # type: ignore[operator]
+        if device_ts_ns >= self.current_frame_start_ts + self.frame_period_ns:
             completed_frame = self._close_current_frame(debug)
             self._start_new_frame(device_ts_ns, seq, debug)
 
@@ -190,10 +190,10 @@ class FrameBuilder:
 
         frame = Frame(
             xyz=xyz,
-            start_ts_ns=self.current_frame_start_ts,  # type: ignore[arg-type]
-            end_ts_ns=self.current_frame_end_ts,  # type: ignore[arg-type]
-            seq_first=self.current_seq_first,  # type: ignore[arg-type]
-            seq_last=self.current_seq_last,  # type: ignore[arg-type]
+            start_ts_ns=self.current_frame_start_ts,
+            end_ts_ns=self.current_frame_end_ts,
+            seq_first=self.current_seq_first,
+            seq_last=self.current_seq_last,
             pkt_count=self.current_pkt_count,
             point_count=len(xyz)
         )

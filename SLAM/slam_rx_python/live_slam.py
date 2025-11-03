@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-G1 Live SLAM - LiDAR Stream Receiver & SLAM Pipeline (C++ Optimized)
+G1 Live SLAM - LiDAR Stream Receiver & SLAM Pipeline
 
 Receives LiDAR packets from lidar_stream transmitter,
 builds frames, and processes with KISS-ICP SLAM.
@@ -9,17 +9,14 @@ Usage:
     python3 live_slam.py [options]
 
 Examples:
-    # Indoor SLAM (10Hz, recommended)
-    python3 live_slam.py --frame-rate 10 --max-range 15.0 --listen-port 9999
+    # Indoor SLAM (20Hz, default settings)
+    python3 live_slam.py --frame-rate 20
 
     # Outdoor SLAM (10Hz, longer range)
-    python3 live_slam.py --frame-rate 10 --max-range 50 --preset outdoor --listen-port 9999
-
-    # With real-time streaming to Mac/PC viewer
-    python3 live_slam.py --frame-rate 10 --listen-port 9999 --stream-enable --stream-port 7609
+    python3 live_slam.py --frame-rate 10 --max-range 50 --preset outdoor
 
     # Debug mode
-    python3 live_slam.py --frame-rate 10 --listen-port 9999 --debug
+    python3 live_slam.py --frame-rate 20 --debug
 """
 
 import socket
@@ -42,8 +39,8 @@ except ImportError:
     print("⚠ ZMQ not available. Install with: pip3 install pyzmq")
 
 # Import our modules
-from lidar_protocol_cpp import LidarProtocol, ProtocolStats  # type: ignore
-from frame_builder_cpp import FrameBuilder, FrameBuilderStats  # type: ignore
+from lidar_protocol import LidarProtocol, ProtocolStats
+from frame_builder import FrameBuilder, FrameBuilderStats
 from slam_pipeline import SlamPipeline, SlamStats
 
 
@@ -259,29 +256,6 @@ class LiveSlam:
         print("\n\n⚠ Shutdown signal received...")
         self.running = False
 
-    def _process_frame(self, frame):
-        """Process a completed frame (helper for both single and batch mode)"""
-        # ========== WARMUP: Skip first N frames ==========
-        if self.warmup_frames < self.warmup_needed:
-            self.warmup_frames += 1
-            if self.warmup_frames == 1:
-                print(f"⏳ [WARMUP] Discarding first {self.warmup_needed} frames for SLAM initialization...")
-            return
-        # =================================================
-
-        result = self.slam_pipeline.register_frame(frame, debug=self.args.debug)
-
-        if result is not None:
-            # Increment frame counter for streaming
-            self.frame_count += 1
-            # Track pose for drift analysis
-            self.pose_history.append(result['pose'].copy())
-            # Trajectory record (wall-clock relative time)
-            t_sec = time.time() - self.start_wall_time
-            self.traj_records.append((t_sec, result['pose'].copy()))
-            # Stream SLAM map to remote viewer
-            self._send_frame(result['pose'], t_sec)
-
     def log_stats(self, force=False):
         """Print periodic statistics"""
         now = time.time()
@@ -388,18 +362,10 @@ class LiveSlam:
 
         print("Listening for LiDAR packets... (Ctrl+C to stop)\n")
 
-        # Batch processing state
-        packet_buffer = []
-        last_batch_time = time.time()
-        use_batch = self.args.use_batch
-
-        if use_batch:
-            print(f"🚀 Batch API enabled: batch_size={self.args.batch_size}, timeout={self.args.batch_timeout_ms}ms\n")
-
         try:
             while self.running:
                 try:
-                    # Receive UDP packet (with short timeout for batch processing)
+                    # Receive UDP packet
                     data, addr = self.sock.recvfrom(2048)
 
                     # Parse packet
@@ -408,76 +374,42 @@ class LiveSlam:
                     if packet is None:
                         continue  # Invalid packet
 
-                    if use_batch:
-                        # ========== BATCH MODE ==========
-                        # Add to buffer
-                        packet_buffer.append(packet)
+                    # Add to frame builder
+                    frame = self.frame_builder.add_packet(
+                        device_ts_ns=packet['device_ts_ns'],
+                        points_xyz=packet['xyz'],
+                        seq=packet['seq'],
+                        debug=self.args.debug
+                    )
 
-                        # Check if we should process the batch
-                        now = time.time()
-                        batch_timeout_s = self.args.batch_timeout_ms / 1000.0
-                        batch_ready = (
-                            len(packet_buffer) >= self.args.batch_size or
-                            (now - last_batch_time) >= batch_timeout_s
-                        )
+                    # Process complete frame
+                    if frame is not None:
+                        # ========== WARMUP: Skip first N frames ==========
+                        if self.warmup_frames < self.warmup_needed:
+                            self.warmup_frames += 1
+                            if self.warmup_frames == 1:
+                                print(f"⏳ [WARMUP] Discarding first {self.warmup_needed} frames for SLAM initialization...")
+                            continue
+                        # =================================================
 
-                        if batch_ready and packet_buffer:
-                            # Process batch
-                            frames = self.frame_builder.add_packets_batch(
-                                device_ts_ns_batch=[p['device_ts_ns'] for p in packet_buffer],
-                                xyz_batch=[p['xyz'] for p in packet_buffer],
-                                seq_batch=[p['seq'] for p in packet_buffer],
-                                debug=self.args.debug
-                            )
+                        result = self.slam_pipeline.register_frame(frame, debug=self.args.debug)
 
-                            # Clear buffer
-                            packet_buffer.clear()
-                            last_batch_time = now
-
-                            # Process all completed frames
-                            for frame in frames:
-                                self._process_frame(frame)
-                        # ================================
-                    else:
-                        # ========== SINGLE-PACKET MODE ==========
-                        # Add to frame builder
-                        frame = self.frame_builder.add_packet(
-                            device_ts_ns=packet['device_ts_ns'],
-                            points_xyz=packet['xyz'],
-                            seq=packet['seq'],
-                            debug=self.args.debug
-                        )
-
-                        # Process complete frame
-                        if frame is not None:
-                            self._process_frame(frame)
-                        # ========================================
+                        if result is not None:
+                            # Increment frame counter for streaming
+                            self.frame_count += 1
+                            # Track pose for drift analysis
+                            self.pose_history.append(result['pose'].copy())
+                            # Trajectory record (wall-clock relative time)
+                            t_sec = time.time() - self.start_wall_time
+                            self.traj_records.append((t_sec, result['pose'].copy()))
+                            # Stream SLAM map to remote viewer
+                            self._send_frame(result['pose'], t_sec)
 
                     # Periodic logging
                     self.log_stats()
 
                 except socket.timeout:
-                    # On timeout, process partial batch if using batch mode
-                    if use_batch and packet_buffer:
-                        now = time.time()
-                        batch_timeout_s = self.args.batch_timeout_ms / 1000.0
-
-                        if (now - last_batch_time) >= batch_timeout_s:
-                            frames = self.frame_builder.add_packets_batch(
-                                device_ts_ns_batch=[p['device_ts_ns'] for p in packet_buffer],
-                                xyz_batch=[p['xyz'] for p in packet_buffer],
-                                seq_batch=[p['seq'] for p in packet_buffer],
-                                debug=self.args.debug
-                            )
-
-                            for frame in frames:
-                                self._process_frame(frame)
-
-                            packet_buffer.clear()
-                            last_batch_time = now
-
                     continue  # Normal timeout, check self.running
-
                 except Exception as e:
                     print(f"❌ Error processing packet: {e}")
                     if self.args.debug:
@@ -590,7 +522,7 @@ def parse_args():
     # Filtering
     parser.add_argument('--min-range', type=float, default=0.1,
                         help='Minimum range (meters)')
-    parser.add_argument('--max-range', type=float, default=20.0,
+    parser.add_argument('--max-range', type=float, default=30.0,
                         help='Maximum range (meters)')
     parser.add_argument('--self-filter-radius', type=float, default=0.30,
                         help='Robot self-filter XY radius (meters)')
@@ -626,14 +558,6 @@ def parse_args():
                         help='Voxel size for stream downsampling (0 = disabled)')
     parser.add_argument('--stream-max-points', type=int, default=60000,
                         help='Max points per streamed frame')
-
-    # Performance: Batch API
-    parser.add_argument('--use-batch', action='store_true',
-                        help='Use batch API for frame building (C++ backend only, reduces overhead)')
-    parser.add_argument('--batch-size', type=int, default=20,
-                        help='Batch size for packet processing (packets per batch)')
-    parser.add_argument('--batch-timeout-ms', type=float, default=5.0,
-                        help='Max wait time for batch accumulation (milliseconds)')
 
     # Debug
     parser.add_argument('--debug', action='store_true',

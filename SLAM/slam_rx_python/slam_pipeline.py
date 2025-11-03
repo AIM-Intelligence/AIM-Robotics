@@ -5,9 +5,10 @@ Wraps KISS-ICP odometry with filtering, coordinate transforms, and statistics.
 """
 
 import numpy as np
-from typing import Dict, Optional, Any
+from typing import Dict, Optional
 from kiss_icp.kiss_icp import KissICP
 from kiss_icp.config import KISSConfig
+from frame_builder import Frame
 
 
 class SlamStats:
@@ -143,7 +144,7 @@ class SlamPipeline:
         return xyz[mask]
 
 
-    def register_frame(self, frame, debug: bool = False) -> Optional[Dict]:
+    def register_frame(self, frame: Frame, debug: bool = False) -> Optional[Dict]:
         """
         Register a frame with KISS-ICP
 
@@ -152,7 +153,7 @@ class SlamPipeline:
         This is the correct approach per unitree_g1_vibes implementation.
 
         Args:
-            frame: Point cloud frame (Frame object or dict from C++ backend)
+            frame: Point cloud frame
             debug: Enable debug logging
 
         Returns:
@@ -166,18 +167,6 @@ class SlamPipeline:
                 'map_points': np.ndarray (Nm, 3) - robot frame
             }
         """
-        # Convert dict to Frame-like object if needed (C++ backend compatibility)
-        if isinstance(frame, dict):
-            class FrameWrapper:
-                def __init__(self, d):
-                    self.xyz = d['xyz']
-                    self.point_count = d['point_count']
-                    self.start_ts_ns = d['start_ts_ns']
-                    self.end_ts_ns = d['end_ts_ns']
-                def duration_s(self):
-                    return (self.end_ts_ns - self.start_ts_ns) / 1e9
-            frame = FrameWrapper(frame)
-
         # Check minimum points
         if frame.point_count < self.min_points_per_frame:
             self.stats.frames_skipped += 1
@@ -325,21 +314,23 @@ if __name__ == "__main__":
 
     print(f"Initialized: {pipeline.stats}")
 
-    # Simulate a frame (dict format from C++ backend)
+    # Simulate a frame
+    from frame_builder import Frame
+
     # Generate random point cloud
     xyz = np.random.rand(5000, 3).astype(np.float32) * 10.0  # 5k points in 10m cube
 
-    frame = {
-        'xyz': xyz,
-        'start_ts_ns': 1000000000,
-        'end_ts_ns': 1050000000,  # 50ms duration
-        'seq_first': 0,
-        'seq_last': 10,
-        'pkt_count': 10,
-        'point_count': 5000
-    }
+    frame = Frame(
+        xyz=xyz,
+        start_ts_ns=1000000000,
+        end_ts_ns=1050000000,  # 50ms duration
+        seq_first=0,
+        seq_last=10,
+        pkt_count=10,
+        point_count=5000
+    )
 
-    print(f"\nTest frame: {frame['point_count']} points, {(frame['end_ts_ns']-frame['start_ts_ns'])/1e9:.3f}s duration")
+    print(f"\nTest frame: {frame}")
 
     # Register
     result = pipeline.register_frame(frame, debug=True)

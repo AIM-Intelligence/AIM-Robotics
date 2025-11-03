@@ -144,7 +144,7 @@ class SlamPipeline:
         return xyz[mask]
 
 
-    def register_frame(self, frame: Frame, debug: bool = False) -> Optional[Dict]:
+    def register_frame(self, frame, debug: bool = False) -> Optional[Dict]:
         """
         Register a frame with KISS-ICP
 
@@ -153,7 +153,7 @@ class SlamPipeline:
         This is the correct approach per unitree_g1_vibes implementation.
 
         Args:
-            frame: Point cloud frame
+            frame: Point cloud frame (Frame object or dict from C++ backend)
             debug: Enable debug logging
 
         Returns:
@@ -167,6 +167,18 @@ class SlamPipeline:
                 'map_points': np.ndarray (Nm, 3) - robot frame
             }
         """
+        # Convert dict to Frame-like object if needed (C++ backend compatibility)
+        if isinstance(frame, dict):
+            class FrameWrapper:
+                def __init__(self, d):
+                    self.xyz = d['xyz']
+                    self.point_count = d['point_count']
+                    self.start_ts_ns = d['start_ts_ns']
+                    self.end_ts_ns = d['end_ts_ns']
+                def duration_s(self):
+                    return (self.end_ts_ns - self.start_ts_ns) / 1e9
+            frame = FrameWrapper(frame)
+
         # Check minimum points
         if frame.point_count < self.min_points_per_frame:
             self.stats.frames_skipped += 1

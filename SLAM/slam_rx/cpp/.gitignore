@@ -1,0 +1,18 @@
+# Build artifacts
+build/
+*.so
+*.o
+*.pyc
+__pycache__/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~

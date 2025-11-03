@@ -121,8 +121,6 @@ Options:
 }
 ```
 
-**Important:** Update `host_ip` to match your Jetson's LiDAR interface IP.
-
 ---
 
 ## Protocol Specification
@@ -445,18 +443,6 @@ print(f"✓ Valid packet: seq={seq}, count={count}, ts={ts}")
 - **Livox SDK2:** https://github.com/Livox-SDK/Livox-SDK2
 - **SLAM Integration:** See `../slam_rx/README.md`
 - **Original System:** `/home/unitree/AIM-Robotics/LiDAR/`
-
----
-
-## License
-
-Part of AIM-Robotics project.
-
----
-
-## Authors
-
-**AIM Robotics Team**
 
 ---
 

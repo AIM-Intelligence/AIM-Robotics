@@ -8,13 +8,13 @@
 
 LiDAR Stream  is a complete rewrite of the original LiDAR streaming system, designed specifically for robust SLAM operation. It addresses critical issues with the legacy system:
 
-✅ **Structured packets** with headers (magic, timestamp, sequence, count)
-✅ **Device-based timestamps** for accurate frame reconstruction
-✅ **Packet loss detection** via sequence numbers
-✅ **MTU-safe segmentation** (1400 byte max payload)
-✅ **Distance gating** and downsampling
-✅ **Little-endian explicit encoding**
-✅ **Protocol versioning** for future extensions
+- ✅ **Structured packets** with headers (magic, timestamp, sequence, count)
+- ✅ **Device-based timestamps** for accurate frame reconstruction
+- ✅ **Packet loss detection** via sequence numbers
+- ✅ **MTU-safe segmentation** (1400 byte max payload)
+- ✅ **Distance gating** and downsampling
+- ✅ **Little-endian explicit encoding**
+- ✅ **Protocol versioning** for future extensions
 
 ---
 

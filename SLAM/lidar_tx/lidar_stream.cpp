@@ -588,6 +588,9 @@ void PointCloudCallback(uint32_t handle, const uint8_t dev_type,
     static Point3D filtered[MAX_FILTERED];
     int filtered_count = 0;
 
+    float min2 = g_min_range * g_min_range;
+    float max2 = g_max_range * g_max_range;
+
     // Filter and convert points
     int skipped_overflow = 0;
     for (int i = 0; i < data->dot_num; i++) {
@@ -609,8 +612,8 @@ void PointCloudCallback(uint32_t handle, const uint8_t dev_type,
         float z = raw_points[i].z / 1000.0f;
 
         // Distance gating
-        float dist = sqrtf(x*x + y*y + z*z);
-        if (dist < g_min_range || dist > g_max_range) {
+        float d2 = x*x + y*y + z*z;
+        if (d2 < min2 || d2 > max2) {
             stats_filtered_points.fetch_add(1, std::memory_order_relaxed);
             continue;
         }

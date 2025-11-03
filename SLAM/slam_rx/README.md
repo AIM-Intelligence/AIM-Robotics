@@ -1,32 +1,32 @@
 # G1 Live SLAM
 
-**모듈식 LiDAR SLAM 수신기 - C++ 최적화 버전**
+**Modular LiDAR SLAM Receiver - C++ Optimized Version**
 
 ---
 
-## 개요
+## Overview
 
-LiDAR Stream 프로토콜을 수신하여 KISS-ICP 기반 SLAM을 수행하는 시스템입니다.
+System for receiving LiDAR Stream protocol and performing KISS-ICP based SLAM.
 
-**주요 특징:**
-- ✅ **C++ 최적화 백엔드** (Protocol + Frame Builder)
-- ✅ 구조화된 패킷 헤더 파싱 (magic, timestamp, sequence, CRC)
-- ✅ 시간 기반 프레임 재구성 (device timestamp 사용)
-- ✅ 패킷 손실 검출 (sequence tracking)
-- ✅ CRC32 무결성 검증
-- ✅ 모듈식 아키텍처 (protocol → frame → SLAM)
-- ✅ 정지 안정성 분석 (drift tracking)
+**Key Features:**
+- C++ Optimized Backend (Protocol + Frame Builder)
+- Structured packet header parsing (magic, timestamp, sequence, CRC)
+- Time-based frame reconstruction (device timestamp)
+- Packet loss detection (sequence tracking)
+- CRC32 integrity verification
+- Modular architecture (protocol → frame → SLAM)
+- Stationary stability analysis (drift tracking)
 
 ---
 
-## 파일 구조
+## File Structure
 
 ```
 /home/unitree/AIM-Robotics/SLAM/slam_rx/
-├── live_slam.py           # 메인 엔트리포인트
-├── slam_pipeline.py       # KISS-ICP 래퍼
-├── build.sh               # C++ 빌드 스크립트
-├── cpp/                   # C++ 최적화 구현
+├── live_slam.py           # Main entry point
+├── slam_pipeline.py       # KISS-ICP wrapper
+├── build.sh               # C++ build script
+├── cpp/                   # C++ optimized implementation
 │   ├── CMakeLists.txt
 │   ├── include/
 │   │   ├── lidar_protocol_cpp.hpp
@@ -36,44 +36,44 @@ LiDAR Stream 프로토콜을 수신하여 KISS-ICP 기반 SLAM을 수행하는 �
 │   │   ├── lidar_protocol_pybind.cpp
 │   │   ├── frame_builder_cpp.cpp        # Frame Builder (Phase 2)
 │   │   └── frame_builder_pybind.cpp
-│   └── build/             # 빌드 출력 (생성됨)
+│   └── build/             # Build output (generated)
 ├── tests/
-│   └── test_protocol.py   # 단위 테스트
-├── lidar_protocol_cpp.so  # 빌드된 C++ 모듈
-├── frame_builder_cpp.so   # 빌드된 C++ 모듈
-└── README.md              # 이 파일
+│   └── test_protocol.py   # Unit tests
+├── lidar_protocol_cpp.so  # Built C++ module
+├── frame_builder_cpp.so   # Built C++ module
+└── README.md              # This file
 ```
 
 ---
 
-## 빠른 시작
+## Quick Start
 
-### 1. 의존성 확인
+### 1. Check Dependencies
 
 ```bash
-# 필수 패키지
+# Required packages
 pip3 install numpy open3d kiss-icp
 
-# C++ 빌드 도구 (이미 설치되어 있어야 함)
-# - g++ 또는 clang++
+# C++ build tools (should already be installed)
+# - g++ or clang++
 # - cmake
 # - python3-dev
 # - pybind11
 ```
 
-### 2. C++ 모듈 빌드
+### 2. Build C++ Modules
 
 ```bash
 cd /home/unitree/AIM-Robotics/SLAM/slam_rx
 
-# 첫 빌드 또는 전체 재빌드
+# First build or full rebuild
 ./build.sh clean
 
-# 빠른 재빌드 (변경된 파일만)
+# Quick rebuild (changed files only)
 ./build.sh
 ```
 
-**빌드 성공 시:**
+**On Successful Build:**
 ```
 ========================================
 ✅ Build successful!
@@ -86,14 +86,14 @@ Testing modules...
 ✅ Both modules work!
 ```
 
-### 3. LiDAR 송신기 시작
+### 3. Start LiDAR Transmitter
 
 ```bash
 cd /home/unitree/AIM-Robotics/SLAM/lidar_tx
 ./build/lidar_stream config.json 127.0.0.1 9999
 ```
 
-### 4. SLAM 수신기 시작
+### 4. Start SLAM Receiver
 
 ```bash
 cd /home/unitree/AIM-Robotics/SLAM/slam_rx
@@ -102,15 +102,15 @@ python3 live_slam.py --frame-rate 10 --max-range 15.0 --listen-port 9999
 
 ---
 
-## 사용 예제
+## Usage Examples
 
-### 기본 실행 (실내, 10Hz)
+### Basic Execution (Indoor, 10Hz)
 
 ```bash
 python3 live_slam.py --frame-rate 10 --max-range 15.0 --listen-port 9999
 ```
 
-**기대 출력:**
+**Expected Output:**
 ```
 ======================================================================
 G1 Live SLAM
@@ -138,7 +138,7 @@ Listening for LiDAR packets... (Ctrl+C to stop)
 ======================================================================
 ```
 
-### 실외 SLAM (저속, 긴 범위)
+### Outdoor SLAM (Low Speed, Long Range)
 
 ```bash
 python3 live_slam.py \
@@ -148,13 +148,13 @@ python3 live_slam.py \
     --listen-port 9999
 ```
 
-### 디버그 모드 (패킷/프레임 상세 로그)
+### Debug Mode (Detailed Packet/Frame Logs)
 
 ```bash
 python3 live_slam.py --frame-rate 10 --listen-port 9999 --debug
 ```
 
-**디버그 출력 예시:**
+**Debug Output Example:**
 ```
 [PROTO] ✓ Valid packet: seq=42, ts=1000000000, pts=105, crc=0x12345678
 [FRAME] ▶ New frame started: ts=1000000000, seq=42
@@ -162,16 +162,16 @@ python3 live_slam.py --frame-rate 10 --listen-port 9999 --debug
 [SLAM] ✓ Frame registered: pts=6892, pos=[0.12, -0.03, 0.01], dist=0.15m
 ```
 
-### 정지 안정성 테스트 (30초)
+### Stationary Stability Test (30 seconds)
 
 ```bash
-# 로봇 고정 후 실행
+# Run after fixing robot in place
 python3 live_slam.py --frame-rate 10 --listen-port 9999
 
-# 30초 후 Ctrl+C
+# After 30 seconds, press Ctrl+C
 ```
 
-**종료 시 drift 분석 출력:**
+**Drift Analysis Output on Exit:**
 ```
 ======================================================================
 POSE DRIFT ANALYSIS (600 samples)
@@ -185,61 +185,61 @@ Max Δt:            0.0234 m
 
 ---
 
-## 명령줄 옵션
+## Command-Line Options
 
-### 네트워크
+### Network
 
-| 옵션 | 기본값 | 설명 |
-|------|--------|------|
-| `--listen-ip` | `0.0.0.0` | UDP 수신 IP |
-| `--listen-port` | `9999` | UDP 수신 포트 |
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--listen-ip` | `0.0.0.0` | UDP listen IP |
+| `--listen-port` | `9999` | UDP listen port |
 
-### 프레임 빌딩
+### Frame Building
 
-| 옵션 | 기본값 | 설명 |
-|------|--------|------|
-| `--frame-rate` | `20` | 목표 프레임 레이트 (Hz) |
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--frame-rate` | `20` | Target frame rate (Hz) |
 
-### 필터링
+### Filtering
 
-| 옵션 | 기본값 | 설명 |
-|------|--------|------|
-| `--min-range` | `0.1` | 최소 거리 (m) |
-| `--max-range` | `20.0` | 최대 거리 (m) |
-| `--self-filter-radius` | `0.4` | 로봇 자가 필터 반경 (m) |
-| `--self-filter-z-min` | `-0.2` | 로봇 자가 필터 Z 최소 (m) |
-| `--self-filter-z-max` | `0.5` | 로봇 자가 필터 Z 최대 (m) |
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--min-range` | `0.1` | Minimum range (m) |
+| `--max-range` | `20.0` | Maximum range (m) |
+| `--self-filter-radius` | `0.4` | Robot self-filter radius (m) |
+| `--self-filter-z-min` | `-0.2` | Robot self-filter Z minimum (m) |
+| `--self-filter-z-max` | `0.5` | Robot self-filter Z maximum (m) |
 
 ### SLAM
 
-| 옵션 | 기본값 | 설명 |
-|------|--------|------|
-| `--voxel-size` | `0.5` | 복셀 다운샘플링 크기 (m) |
-| `--min-points-per-frame` | `800` | 프레임당 최소 포인트 (안정성) |
-| `--preset` | `indoor` | 프리셋 (`indoor`, `outdoor`, `custom`) |
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--voxel-size` | `0.5` | Voxel downsampling size (m) |
+| `--min-points-per-frame` | `800` | Minimum points per frame (stability) |
+| `--preset` | `indoor` | Preset (`indoor`, `outdoor`, `custom`) |
 
-### 출력
+### Output
 
-| 옵션 | 기본값 | 설명 |
-|------|--------|------|
-| `--no-save-map` | `False` | 종료 시 맵 저장 안 함 |
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--no-save-map` | `False` | Don't save map on exit |
 
-### 디버그
+### Debug
 
-| 옵션 | 기본값 | 설명 |
-|------|--------|------|
-| `--debug` | `False` | 디버그 로그 활성화 |
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--debug` | `False` | Enable debug logging |
 
 ---
 
-## 단위 테스트
+## Unit Tests
 
 ```bash
 cd /home/unitree/AIM-Robotics/SLAM/slam_rx/tests
 python3 test_protocol.py
 ```
 
-**예상 출력:**
+**Expected Output:**
 ```
 ======================================================================
 LiDAR Protocol  Parser - Unit Tests
@@ -260,41 +260,41 @@ RESULTS: 6/6 passed, 0 failed
 
 ---
 
-## 성능 (C++ 최적화)
+## Performance (C++ Optimization)
 
-**실측 결과** (Livox Mid-360, 2000 pps, 10 Hz):
+**Measured Results** (Livox Mid-360, 2000 pps, 10 Hz):
 
-| 단계 | Python | C++ | 개선율 |
-|------|--------|-----|--------|
+| Phase | Python | C++ | Speedup |
+|-------|--------|-----|---------|
 | **Phase 1 (Protocol)** | 20.67 ms/frame | 7.68 ms/frame | **2.69x** |
 | **Phase 2 (Frame)** | 5.16 ms/frame | 3.25 ms/frame | **1.59x** |
-| **SLAM (KISS-ICP)** | 29.13 ms/frame | 29.13 ms/frame | 동일 (이미 C++) |
-| **전체** | **54.96 ms** | **40.06 ms** | **1.37x** |
+| **SLAM (KISS-ICP)** | 29.13 ms/frame | 29.13 ms/frame | Same (already C++) |
+| **Total** | **54.96 ms** | **40.06 ms** | **1.37x** |
 
-**핵심 효과:**
-- ✅ CPU 사용률 **~15% 감소** (로봇 다른 작업에 여유)
-- ✅ 전체 처리 시간 **27% 단축** (14.9ms 절감)
-- ✅ 배터리 수명 증가
-- ✅ 실시간 처리 여유 확보 (10Hz @ 40ms/frame = 40% CPU utilization)
+**Key Benefits:**
+- CPU usage reduced by ~15% (more headroom for other tasks)
+- Total processing time reduced by 27% (14.9ms saved per frame)
+- Battery life improved
+- Real-time processing margin: 10Hz @ 40ms/frame = 40% CPU utilization
 
 ---
 
-## 성능 파라미터
+## Performance Tuning
 
-### 프레임 레이트 조정
+### Adjusting Frame Rate
 
-**증상:** 정지 시 흔들림이 심함
-**해결:** 프레임 레이트를 낮춤
+**Symptom:** Excessive jitter when stationary
+**Solution:** Lower frame rate
 
 ```bash
 # 10Hz → 5Hz
 python3 live_slam.py --frame-rate 5 --listen-port 9999
 ```
 
-### 저포인트 프레임 스킵
+### Low Point Frame Skipping
 
-**증상:** 노이즈가 많은 환경에서 불안정
-**해결:** `--min-points-per-frame` 증가
+**Symptom:** Unstable in noisy environments
+**Solution:** Increase `--min-points-per-frame`
 
 ```bash
 python3 live_slam.py --frame-rate 10 --min-points-per-frame 1200 --listen-port 9999
@@ -302,125 +302,125 @@ python3 live_slam.py --frame-rate 10 --min-points-per-frame 1200 --listen-port 9
 
 ---
 
-## Acceptance Criteria (수용 기준)
+## Acceptance Criteria
 
-### 1. 정지 안정성 ✅
-- **조건:** 로봇 고정 30초 동안 mean(|Δt|) < 0.02m
-- **확인:** 종료 시 "POSE DRIFT ANALYSIS" 출력 확인
+### 1. Stationary Stability
+- **Condition:** mean(|Δt|) < 0.02m over 30 seconds with robot fixed
+- **Verification:** Check "POSE DRIFT ANALYSIS" output on exit
 
-### 2. 프레임 레이트 ✅
-- **조건:** frame_rate ≈ CLI 설정값 (±10%)
-- **확인:** `[FRAME] Built:` 로그에서 1초당 프레임 수 확인
+### 2. Frame Rate
+- **Condition:** frame_rate ≈ CLI setting (±10%)
+- **Verification:** Check frames per second in `[FRAME] Built:` log
 
-### 3. CRC/파서 ✅
-- **조건:** `crc_fail == 0`, `bad_magic == 0`, `len_mismatch == 0`
-- **확인:** `[RX] Errors:` 로그에서 모든 오류 == 0
+### 3. CRC/Parser
+- **Condition:** `crc_fail == 0`, `bad_magic == 0`, `len_mismatch == 0`
+- **Verification:** All errors == 0 in `[RX] Errors:` log
 
-### 4. 세그먼트 무손실 ✅
-- **조건:** `late_packets == 0` (정상 네트워크), `seq_gap` 존재 시에도 정상 동작
-- **확인:** `[FRAME] Late:` 및 `Gaps:` 로그 확인
+### 4. Lossless Segments
+- **Condition:** `late_packets == 0` (normal network), operates correctly even with `seq_gap`
+- **Verification:** Check `[FRAME] Late:` and `Gaps:` logs
 
-### 5. 종료 ✅
-- **조건:** Ctrl+C 시 예외 없이 맵 저장 완료
-- **확인:** `slam_map__YYYYMMDD_HHMMSS.pcd` 파일 생성
+### 5. Shutdown
+- **Condition:** Map saved without exceptions on Ctrl+C
+- **Verification:** `slam_map__YYYYMMDD_HHMMSS.pcd` file created
 
 ---
 
-## 트러블슈팅
+## Troubleshooting
 
-### 문제: "ModuleNotFoundError: No module named 'lidar_protocol_cpp'"
+### Problem: "ModuleNotFoundError: No module named 'lidar_protocol_cpp'"
 
-**원인:** C++ 모듈이 빌드되지 않았거나 .so 파일이 없음
+**Cause:** C++ modules not built or .so files missing
 
-**해결:**
+**Solution:**
 ```bash
 cd /home/unitree/AIM-Robotics/SLAM/slam_rx
 
-# 전체 재빌드
+# Full rebuild
 ./build.sh clean
 
-# .so 파일 확인
+# Verify .so files
 ls -lh *.so
 ```
 
-### 문제: 빌드 실패 "pybind11 not found"
+### Problem: Build Failure "pybind11 not found"
 
-**원인:** pybind11 라이브러리가 설치되지 않음
+**Cause:** pybind11 library not installed
 
-**해결:**
+**Solution:**
 ```bash
 # Ubuntu/Debian
 sudo apt-get install python3-pybind11
 
-# 또는 pip로 설치
+# Or install via pip
 pip3 install pybind11
 ```
 
-### 문제: "No packets received"
+### Problem: "No packets received"
 
-**원인:** 송신기 미실행 또는 포트 불일치
+**Cause:** Transmitter not running or port mismatch
 
-**해결:**
+**Solution:**
 ```bash
-# 송신기 확인
+# Check transmitter
 ps aux | grep lidar_stream
 
-# 송신기 재시작
+# Restart transmitter
 cd /home/unitree/AIM-Robotics/SLAM/lidar_tx
 ./build/lidar_stream config.json 127.0.0.1 9999
 ```
 
-### 문제: "CRC failures"
+### Problem: "CRC failures"
 
-**원인:** 송신기와 수신기 CRC 설정 불일치
+**Cause:** CRC configuration mismatch between transmitter and receiver
 
-**해결:**
+**Solution:**
 ```bash
-# 송신기 CRC 비활성화
+# Disable CRC in transmitter
 ./build/lidar_stream config.json 127.0.0.1 9999
 
-# 또는 수신기에서 CRC 검증 비활성화 (lidar_protocol.py 수정)
+# Or disable CRC verification in receiver (modify lidar_protocol.py)
 # validate_crc=False
 ```
 
-### 문제: "Frames skipped (low point count)"
+### Problem: "Frames skipped (low point count)"
 
-**원인:** 필터링 후 포인트가 너무 적음
+**Cause:** Too few points after filtering
 
-**해결:**
+**Solution:**
 ```bash
-# min_points_per_frame 낮춤
+# Lower min_points_per_frame
 python3 live_slam.py --min-points-per-frame 500 --listen-port 9999
 
-# 또는 범위 확장
+# Or increase range
 python3 live_slam.py --max-range 30.0 --listen-port 9999
 ```
 
-### 문제: "Sequence gaps"
+### Problem: "Sequence gaps"
 
-**원인:** UDP 패킷 손실 (네트워크 혼잡)
+**Cause:** UDP packet loss (network congestion)
 
-**확인:** 송신기 로그에서 `Dropped packets` 확인
+**Verification:** Check `Dropped packets` in transmitter logs
 
-**해결:**
-- 로컬 네트워크 사용 (127.0.0.1)
-- 송신기에서 `--downsample 2` 적용 (대역폭 감소)
+**Solution:**
+- Use local network (127.0.0.1)
+- Apply `--downsample 2` in transmitter (reduce bandwidth)
 
 ---
 
-## ZMQ 실시간 스트리밍
+## ZMQ Real-time Streaming
 
-맥/원격 PC에서 실시간 맵 확인:
+View real-time map on Mac/remote PC:
 
 ```bash
-# Jetson (송신)
+# Jetson (transmit)
 python3 live_slam.py \
     --frame-rate 10 \
     --listen-port 9999 \
     --stream-enable \
     --stream-port 7609
 
-# Mac/PC (수신)
+# Mac/PC (receive)
 python3 viewer_realtime.py \
     --server-ip 192.168.123.164 \
     --port 7609 \
@@ -429,27 +429,27 @@ python3 viewer_realtime.py \
 
 ---
 
-## 시스템 특징
+## System Features
 
-| 항목 | 설명 |
-|------|------|
-| 패킷 형식 | 27B header + points (magic, timestamp, sequence, CRC) |
-| 타임스탬프 | 장치 하드웨어 시간 (ns 정밀도) |
-| 프레임 재구성 | 시간 윈도우 기반 (10Hz = 0.1s periods) |
-| 손실 검출 | Sequence tracking |
-| CRC 검증 | IEEE 802.3 CRC32 |
-| 백엔드 | C++ (pybind11 bindings) |
-| 빌드 시스템 | CMake + build.sh wrapper |
-| 구조 | 모듈식 (live_slam.py, slam_pipeline.py, cpp/) |
+| Feature | Description |
+|---------|-------------|
+| Packet format | 27B header + points (magic, timestamp, sequence, CRC) |
+| Timestamp | Device hardware time (ns precision) |
+| Frame reconstruction | Time window based (10Hz = 0.1s periods) |
+| Loss detection | Sequence tracking |
+| CRC verification | IEEE 802.3 CRC32 |
+| Backend | C++ (pybind11 bindings) |
+| Build system | CMake + build.sh wrapper |
+| Structure | Modular (live_slam.py, slam_pipeline.py, cpp/) |
 
 ---
 
-## 라이센스
+## License
 
 Part of AIM-Robotics project.
 
 ---
 
-## 작성자
+## Authors
 
 AIM Robotics Team - 2025-11-02

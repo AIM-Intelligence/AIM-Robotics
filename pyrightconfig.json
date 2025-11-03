@@ -1,0 +1,7 @@
+{
+  "extraPaths": [
+    "/home/unitree/unitree_sdk2_python"
+  ],
+  "venvPath": "/usr",
+  "pythonVersion": "3.8"
+}

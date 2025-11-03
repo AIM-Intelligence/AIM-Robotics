@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-viewer_realtime_simple.py — Simple Real-time G1 SLAM Viewer (Mac)
+viewer_realtime.py — Simple Real-time G1 SLAM Viewer (Mac)
 
 Receives ZMQ stream from Jetson and renders with Open3D.
 Uses modern gui.Application API for stable rendering.
 
 Usage:
-    python3 viewer_realtime_simple.py --server-ip 192.168.123.164 --port 7609 --flip-y --flip-z
+    python3 viewer_realtime.py --server-ip 192.168.123.164 --port 7609 --flip-y --flip-z
 
 Controls:
     Mouse - Rotate/Pan/Zoom

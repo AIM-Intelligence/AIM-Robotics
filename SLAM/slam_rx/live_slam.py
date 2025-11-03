@@ -50,6 +50,12 @@ from slam_pipeline import SlamPipeline, SlamStats
 class LiveSlam:
     """Main SLAM application"""
 
+    # Configuration constants
+    SOCKET_TIMEOUT_S = 0.1
+    UDP_BUFFER_SIZE = 2048
+    LOG_INTERVAL_S = 1.0
+    WARMUP_FRAMES_NEEDED = 0  # No warmup needed with proper coordinate transform
+
     def __init__(self, args):
         self.args = args
         self.running = True
@@ -87,7 +93,7 @@ class LiveSlam:
 
         # Logging
         self.last_log_time = time.time()
-        self.log_interval = 1.0  # seconds
+        self.log_interval = self.LOG_INTERVAL_S
 
         # Pose drift tracking (for stationary test)
         self.pose_history = []
@@ -106,11 +112,9 @@ class LiveSlam:
         self.zctx = None
         self.pub = None
 
-        # ========== Warmup for SLAM initialization ==========
-        # DISABLED - Not needed with proper coordinate transform
+        # Warmup for SLAM initialization (disabled - not needed with proper coordinate transform)
         self.warmup_frames = 0
-        self.warmup_needed = 0  # No warmup (was 10, but unitree_g1_vibes doesn't use warmup)
-        # ====================================================
+        self.warmup_needed = self.WARMUP_FRAMES_NEEDED
 
         if self.stream_enabled:
             self.zctx = zmq.Context.instance()
@@ -250,7 +254,7 @@ class LiveSlam:
         """Create and configure UDP socket"""
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind((self.args.listen_ip, self.args.listen_port))
-        self.sock.settimeout(0.1)  # 100ms timeout for clean shutdown
+        self.sock.settimeout(self.SOCKET_TIMEOUT_S)
 
         print(f"✓ UDP socket listening on {self.args.listen_ip}:{self.args.listen_port}")
 
@@ -400,7 +404,7 @@ class LiveSlam:
             while self.running:
                 try:
                     # Receive UDP packet (with short timeout for batch processing)
-                    data, addr = self.sock.recvfrom(2048)
+                    data, addr = self.sock.recvfrom(self.UDP_BUFFER_SIZE)
 
                     # Parse packet
                     packet = self.protocol.parse_datagram(data, debug=self.args.debug)

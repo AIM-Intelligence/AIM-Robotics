@@ -24,19 +24,23 @@ LiDAR Stream 프로토콜을 수신하여 KISS-ICP 기반 SLAM을 수행하는 �
 ```
 /home/unitree/AIM-Robotics/SLAM/slam_rx/
 ├── live_slam.py           # 메인 엔트리포인트
-├── backend.py             # 백엔드 선택 (C++ 기본, Python fallback)
 ├── slam_pipeline.py       # KISS-ICP 래퍼
+├── build.sh               # C++ 빌드 스크립트
 ├── cpp/                   # C++ 최적화 구현
+│   ├── CMakeLists.txt
 │   ├── include/
 │   │   ├── lidar_protocol_cpp.hpp
 │   │   └── frame_builder_cpp.hpp
-│   └── src/
-│       ├── lidar_protocol_cpp.cpp       # Protocol Parser (Phase 1)
-│       ├── lidar_protocol_pybind.cpp
-│       ├── frame_builder_cpp.cpp        # Frame Builder (Phase 2)
-│       └── frame_builder_pybind.cpp
+│   ├── src/
+│   │   ├── lidar_protocol_cpp.cpp       # Protocol Parser (Phase 1)
+│   │   ├── lidar_protocol_pybind.cpp
+│   │   ├── frame_builder_cpp.cpp        # Frame Builder (Phase 2)
+│   │   └── frame_builder_pybind.cpp
+│   └── build/             # 빌드 출력 (생성됨)
 ├── tests/
 │   └── test_protocol.py   # 단위 테스트
+├── lidar_protocol_cpp.so  # 빌드된 C++ 모듈
+├── frame_builder_cpp.so   # 빌드된 C++ 모듈
 └── README.md              # 이 파일
 ```
 
@@ -49,23 +53,52 @@ LiDAR Stream 프로토콜을 수신하여 KISS-ICP 기반 SLAM을 수행하는 �
 ```bash
 # 필수 패키지
 pip3 install numpy open3d kiss-icp
+
+# C++ 빌드 도구 (이미 설치되어 있어야 함)
+# - g++ 또는 clang++
+# - cmake
+# - python3-dev
+# - pybind11
 ```
 
-### 2. LiDAR 송신기 시작
+### 2. C++ 모듈 빌드
+
+```bash
+cd /home/unitree/AIM-Robotics/SLAM/slam_rx
+
+# 첫 빌드 또는 전체 재빌드
+./build.sh clean
+
+# 빠른 재빌드 (변경된 파일만)
+./build.sh
+```
+
+**빌드 성공 시:**
+```
+========================================
+✅ Build successful!
+========================================
+
+-rw-rw-r-- 1 unitree unitree 234K Nov  3 10:15 frame_builder_cpp.so
+-rw-rw-r-- 1 unitree unitree 198K Nov  3 10:15 lidar_protocol_cpp.so
+
+Testing modules...
+✅ Both modules work!
+```
+
+### 3. LiDAR 송신기 시작
 
 ```bash
 cd /home/unitree/AIM-Robotics/SLAM/lidar_tx
 ./build/lidar_stream config.json 127.0.0.1 9999
 ```
 
-### 3. SLAM 수신기 시작 (C++ 백엔드 기본)
+### 4. SLAM 수신기 시작
 
 ```bash
 cd /home/unitree/AIM-Robotics/SLAM/slam_rx
 python3 live_slam.py --frame-rate 10 --max-range 15.0 --listen-port 9999
 ```
-
-> **참고**: C++ 백엔드가 기본으로 사용됩니다. Python 테스트용: `SLAMRX_BACKEND=py python3 live_slam.py`
 
 ---
 
@@ -79,10 +112,6 @@ python3 live_slam.py --frame-rate 10 --max-range 15.0 --listen-port 9999
 
 **기대 출력:**
 ```
-[BACKEND] ✓ Using C++ optimized backend
-[BACKEND]   - lidar_protocol_cpp (Phase 1)
-[BACKEND]   - frame_builder_cpp (Phase 2)
-
 ======================================================================
 G1 Live SLAM
 ======================================================================
@@ -246,15 +275,7 @@ RESULTS: 6/6 passed, 0 failed
 - ✅ CPU 사용률 **~15% 감소** (로봇 다른 작업에 여유)
 - ✅ 전체 처리 시간 **27% 단축** (14.9ms 절감)
 - ✅ 배터리 수명 증가
-
-**백엔드 전환:**
-```bash
-# C++ 백엔드 (기본)
-python3 live_slam.py --frame-rate 10 --listen-port 9999
-
-# Python 백엔드 (테스트/디버깅용)
-SLAMRX_BACKEND=py python3 live_slam.py --frame-rate 10 --listen-port 9999
-```
+- ✅ 실시간 처리 여유 확보 (10Hz @ 40ms/frame = 40% CPU utilization)
 
 ---
 
@@ -306,6 +327,34 @@ python3 live_slam.py --frame-rate 10 --min-points-per-frame 1200 --listen-port 9
 ---
 
 ## 트러블슈팅
+
+### 문제: "ModuleNotFoundError: No module named 'lidar_protocol_cpp'"
+
+**원인:** C++ 모듈이 빌드되지 않았거나 .so 파일이 없음
+
+**해결:**
+```bash
+cd /home/unitree/AIM-Robotics/SLAM/slam_rx
+
+# 전체 재빌드
+./build.sh clean
+
+# .so 파일 확인
+ls -lh *.so
+```
+
+### 문제: 빌드 실패 "pybind11 not found"
+
+**원인:** pybind11 라이브러리가 설치되지 않음
+
+**해결:**
+```bash
+# Ubuntu/Debian
+sudo apt-get install python3-pybind11
+
+# 또는 pip로 설치
+pip3 install pybind11
+```
 
 ### 문제: "No packets received"
 
@@ -372,7 +421,7 @@ python3 live_slam.py \
     --stream-port 7609
 
 # Mac/PC (수신)
-python3 viewer_realtime_simple.py \
+python3 viewer_realtime.py \
     --server-ip 192.168.123.164 \
     --port 7609 \
     --flip-y --flip-z
@@ -389,8 +438,9 @@ python3 viewer_realtime_simple.py \
 | 프레임 재구성 | 시간 윈도우 기반 (10Hz = 0.1s periods) |
 | 손실 검출 | Sequence tracking |
 | CRC 검증 | IEEE 802.3 CRC32 |
-| 백엔드 | C++ (Protocol + Frame), Python fallback 지원 |
-| 구조 | 모듈식 (backend.py, slam_pipeline.py, cpp/) |
+| 백엔드 | C++ (pybind11 bindings) |
+| 빌드 시스템 | CMake + build.sh wrapper |
+| 구조 | 모듈식 (live_slam.py, slam_pipeline.py, cpp/) |
 
 ---
 
@@ -403,7 +453,3 @@ Part of AIM-Robotics project.
 ## 작성자
 
 AIM Robotics Team - 2025-11-02
-
----
-
-**Made with 🤖 by Claude Code**

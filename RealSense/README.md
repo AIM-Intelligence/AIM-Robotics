@@ -1,19 +1,19 @@
 # 📷 Intel RealSense D435i
 
-Unitree G1 (Jetson Orin NX)에서 실시간 RGB-D 카메라 스트리밍
+Real-time RGB-D camera streaming on Unitree G1 (Jetson Orin NX)
 
 <table>
 <tr>
 <td width="50%">
 
-**RGB 스트림**
+**RGB Stream**
 
 ![RGB Stream](RGB.png)
 
 </td>
 <td width="50%">
 
-**Depth 스트림 (컬러맵)**
+**Depth Stream (Colormap)**
 
 ![Depth Stream](Depth.png)
 
@@ -21,338 +21,336 @@ Unitree G1 (Jetson Orin NX)에서 실시간 RGB-D 카메라 스트리밍
 </tr>
 </table>
 
-## 📋 프로젝트 목표
+## 📋 Project Goal
 
-Jetson의 RealSense D435i에서 RGB + Depth 캡처 → 압축 → 패킷 분할 → UDP로 Mac에 스트리밍 → 실시간 표시
+Capture RGB + Depth from RealSense D435i on Jetson → Compress → Packetize → Stream via UDP to Mac → Display in real-time
 
-LiDAR 뷰어와 동일한 패턴: 빠른 프로토타이핑을 위한 간단한 UDP 방식
-
+Same pattern as LiDAR viewer: simple UDP approach for rapid prototyping
 
 ---
 
-## 📂 프로젝트 구조
+## 📂 Project Structure
 
 ```
 RealSense/
 ├── examples/
-│   ├── 00_check_camera.py       # 카메라 감지 및 확인
-│   ├── 01_basic_capture.py      # 로컬 테스트 (프레임 캡처 + 분석)
-│   ├── 02_stream_sender.py      # Jetson → Mac 송신 (압축 + 패킷 분할)
-│   └── 03_stream_receiver.py    # Mac 수신 및 표시
+│   ├── 00_check_camera.py       # Camera detection and verification
+│   ├── 01_basic_capture.py      # Local test (frame capture + analysis)
+│   ├── 02_stream_sender.py      # Jetson → Mac sender (compression + packetization)
+│   └── 03_stream_receiver.py    # Mac receiver and display
 └── README.md
 ```
 
 ---
 
-## 🔄 데이터 흐름
+## 🔄 Data Flow
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│ Jetson (로봇)                                                 │
-│                                                              │
-│  RealSense D435i                                             │
-│     ├─ RGB (640x480 BGR)  ──┐                                │
-│     └─ Depth (640x480 mm)   │                                │
-│                             ▼                                │
-│  02_stream_sender.py                                         │
-│     ├─ JPEG 압축 (RGB: 900KB → 22KB)                          │
-│     ├─ PNG 압축 (Depth: 600KB → 190KB)                        │
-│     ├─ 패킷 분할 (60KB 청크)                                    │
-│     └─ UDP socket ────────────────────────────────────────┐  │
-└──────────────────────────────────────────────────────────────┘
-                                                            │
-                                                            │ UDP 8889 (RGB)
-                                                            │ UDP 8890 (Depth)
-                                                            │
-┌──────────────────────────────────────────────────────────────┐
-│ Mac (지상국)                                                │  │
-│                                                           │  │
-│  03_stream_receiver.py                                    │  │
-│     ├─ UDP socket ◄───────────────────────────────────────┘  │
-│     ├─ 패킷 재조립                                              │
-│     ├─ JPEG/PNG 디코딩                                         │
-│     └─ OpenCV 표시                                            │
-│         ├─ RGB 창                                            │
-│         └─ Depth (컬러맵) 창                                   │
-└──────────────────────────────────────────────────────────────┘
++--------------------------------------------------------------+
+| Jetson (Robot)                                               |
+|                                                              |
+|  RealSense D435i                                             |
+|     ├─ RGB (640x480 BGR)  ──┐                                |
+|     └─ Depth (640x480 mm)   │                                |
+|                             v                                |
+|  02_stream_sender.py                                         |
+|     ├─ JPEG compression (RGB: 900KB → 22KB)                  |
+|     ├─ PNG compression (Depth: 600KB → 190KB)                |
+|     ├─ Packet fragmentation (60KB chunks)                    |
+|     └─ UDP socket ────────────────────────────────────────┐  |
++--------------------------------------------------------------+
+                                                            |
+                                                            | UDP 8889 (RGB)
+                                                            | UDP 8890 (Depth)
+                                                            |
++--------------------------------------------------------------+
+| Mac (Ground Station)                                      |  |
+|                                                           |  |
+|  03_stream_receiver.py                                    |  |
+|     ├─ UDP socket ◄───────────────────────────────────────┘  |
+|     ├─ Packet reassembly                                     |
+|     ├─ JPEG/PNG decoding                                     |
+|     └─ OpenCV display                                        |
+|         ├─ RGB window                                        |
+|         └─ Depth (colormap) window                           |
++--------------------------------------------------------------+
 ```
 
 ---
 
-### ✅ Phase 1: 로컬 테스트
+### ✅ Phase 1: Local Testing
 
 **00_check_camera.py**
-- RealSense 디바이스 감지
-- USB 연결 확인
-- 기본 프레임 캡처 테스트
-- 30프레임 안정화 (Device Busy 방지)
+- Detect RealSense device
+- Verify USB connection
+- Test basic frame capture
+- 30-frame warm-up (prevent Device Busy)
 
 **01_basic_capture.py**
-- RGB + Depth 프레임 캡처
-- 상세 통계 분석 (depth 분포, 색상 채널 등)
-- 샘플 픽셀 값 표시
-- 파일 저장 기능 제거 (화면 출력만)
+- Capture RGB + Depth frames
+- Detailed statistics (depth distribution, color channels, etc.)
+- Display sample pixel values
+- Screen display only (no file saving)
 
-**목적:** 카메라 기능 확인 및 데이터 검증
+**Purpose:** Verify camera functionality and data
 
 ---
 
-### ✅ Phase 2: 네트워크 스트리밍
+### ✅ Phase 2: Network Streaming
 
 **02_stream_sender.py** (Jetson)
-- RealSense 초기화 및 30프레임 안정화
-- **JPEG 압축** (RGB: 85% 품질, ~22KB)
-- **PNG 압축** (Depth: 무손실 16-bit, ~190KB)
-- **패킷 분할** (60KB 청크, UDP 제한 회피)
-- UDP로 Mac에 전송 (별도 포트)
-- 실시간 FPS 및 전송량 표시
+- RealSense initialization with 30-frame warm-up
+- **JPEG compression** (RGB: 85% quality, ~22KB)
+- **PNG compression** (Depth: lossless 16-bit, ~190KB)
+- **Packet fragmentation** (60KB chunks, avoid UDP limits)
+- UDP transmission to Mac (separate ports)
+- Real-time FPS and bandwidth display
 
 **03_stream_receiver.py** (Mac)
-- UDP 패킷 수신 (멀티스레드)
-- **패킷 재조립** (sequence_id + chunk_index)
-- JPEG/PNG 디코딩
-- OpenCV 실시간 표시
-- FPS 및 depth 통계 overlay
+- UDP packet reception (multi-threaded)
+- **Packet reassembly** (sequence_id + chunk_index)
+- JPEG/PNG decoding
+- OpenCV real-time display
+- FPS and depth statistics overlay
 
-**핵심 기술:**
-- 압축으로 대역폭 97% 감소 (900KB → 22KB)
-- 패킷 분할로 UDP 크기 제한 해결
-- 무손실 depth 전송 (PNG 16-bit)
+**Key Technologies:**
+- Compression reduces bandwidth by 97% (900KB → 22KB)
+- Packet fragmentation solves UDP size limits
+- Lossless depth transmission (PNG 16-bit)
 
 ---
 
-## 🚀 사용 방법
+## 🚀 Usage
 
-### 사전 준비
+### Prerequisites
 
-#### RealSense SDK 설치 (Jetson에서 한 번만)
+#### Install RealSense SDK (Jetson, one-time)
 
-**librealsense 빌드:**
+**Build librealsense:**
 ```bash
 git clone https://github.com/IntelRealSense/librealsense.git
 cd ~/librealsense
 
-# 빌드 (Python 바인딩 포함)
+# Build with Python bindings
 mkdir build && cd build
 cmake .. -DBUILD_PYTHON_BINDINGS:bool=true
 make -j$(nproc)
 sudo make install
 ```
 
-**참고:**
-- 빌드 시간: 약 10-15분 (Jetson Orin NX 기준)
-- Python 바인딩이 필요하므로 `-DBUILD_PYTHON_BINDINGS:bool=true` 필수
-- 공식 문서: https://github.com/IntelRealSense/librealsense
+**Note:**
+- Build time: ~10-15 minutes (Jetson Orin NX)
+- `-DBUILD_PYTHON_BINDINGS:bool=true` required for Python bindings
+- Official docs: https://github.com/IntelRealSense/librealsense
 
-#### Python 패키지 설치
+#### Install Python Packages
 
-**Jetson (로봇):**
+**Jetson (Robot):**
 ```bash
 pip3 install pyrealsense2 numpy opencv-python
 ```
 
-**Mac (지상국):**
+**Mac (Ground Station):**
 ```bash
 pip3 install numpy opencv-python
 ```
 
-### 실행
+### Run
 
-**1. 카메라 연결 확인 (Jetson):**
+**1. Check camera connection (Jetson):**
 ```bash
 cd /home/unitree/AIM-Robotics/RealSense/examples
 python3 00_check_camera.py
 ```
 
-**2. 로컬 캡처 테스트 (Jetson, 선택):**
+**2. Local capture test (Jetson, optional):**
 ```bash
 python3 01_basic_capture.py
 ```
 
-**3. 스트리밍 시작 (Jetson):**
+**3. Start streaming (Jetson):**
 ```bash
 python3 02_stream_sender.py
 ```
 
-**참고:** `MAC_IP` 변수를 Mac의 **유선 IP**로 설정하세요!
+**Note:** Set `MAC_IP` variable to Mac's **wired IP**!
 ```python
 # 02_stream_sender.py
-MAC_IP = "192.168.123.99"  # Mac 유선 IP
+MAC_IP = "192.168.123.99"  # Mac wired IP
 ```
 
-**4. 수신 및 표시 (Mac):**
+**4. Receive and display (Mac):**
 ```bash
-# 03_stream_receiver.py를 Mac으로 복사 후
+# Copy 03_stream_receiver.py to Mac, then:
 python3 03_stream_receiver.py
 ```
 
-종료: `q` 키 또는 `Ctrl+C`
+Exit: `q` key or `Ctrl+C`
 
 
-## ⚙️ 설정
+## ⚙️ Configuration
 
 ```python
 # 02_stream_sender.py
-MAC_IP = "192.168.123.99"  # Mac IP (유선 권장!)
-RGB_PORT = 8889           # RGB 스트림 포트
-DEPTH_PORT = 8890         # Depth 스트림 포트
-CHUNK_SIZE = 60000        # 60KB 청크 (UDP 안전 크기)
+MAC_IP = "192.168.123.99"  # Mac IP (wired recommended!)
+RGB_PORT = 8889           # RGB stream port
+DEPTH_PORT = 8890         # Depth stream port
+CHUNK_SIZE = 60000        # 60KB chunks (UDP safe size)
 
-# 스트림 설정
+# Stream settings
 Width: 640
 Height: 480
 FPS: 30
 
-# 압축 설정
-JPEG Quality: 85          # RGB 압축률
-PNG: Lossless 16-bit      # Depth 무손실
+# Compression settings
+JPEG Quality: 85          # RGB compression
+PNG: Lossless 16-bit      # Depth lossless
 ```
 
 ---
 
-## 🎨 Depth 시각화
+## 🎨 Depth Visualization
 
-Depth를 JET 컬러맵으로 변환:
+Convert depth to JET colormap:
 
 ```python
-# 0-10m 범위를 0-255로 정규화
+# Normalize 0-10m range to 0-255
 depth_normalized = np.clip(depth_image / 10000.0 * 255, 0, 255).astype(np.uint8)
 depth_colormap = cv2.applyColorMap(depth_normalized, cv2.COLORMAP_JET)
 ```
 
-**색상 의미:**
-- 🔵 파랑/보라: 가까움 (0-2m)
-- 🟢 초록/노랑: 중간 (2-5m)
-- 🔴 빨강: 멀리 (5-10m)
+**Color Meaning:**
+- 🔵 Blue/Purple: Close (0-2m)
+- 🟢 Green/Yellow: Medium (2-5m)
+- 🔴 Red: Far (5-10m)
 
 ---
 
-## 📷 카메라 정보
+## 📷 Camera Info
 
-**감지된 디바이스:**
+**Detected Device:**
 ```
-이름:           Intel RealSense D435I
-시리얼 번호:    335522070701
-펌웨어:         5.13.0.55
-USB 타입:       3.2 (USB 3.1 포트)
+Name:           Intel RealSense D435I
+Serial:         335522070701
+Firmware:       5.13.0.55
+USB Type:       3.2 (USB 3.1 port)
 ```
 
-**사용 가능한 센서:**
-- Stereo Module (Depth 센서)
-- RGB Camera (컬러 이미지)
-- Motion Module (IMU - 자이로/가속도계)
+**Available Sensors:**
+- Stereo Module (Depth sensor)
+- RGB Camera (Color image)
+- Motion Module (IMU - gyro/accelerometer)
 
-**테스트된 스트림:**
-- Depth: 640x480 @ 30fps (16-bit, 밀리미터)
+**Tested Streams:**
+- Depth: 640x480 @ 30fps (16-bit, millimeters)
 - Color: 640x480 @ 30fps (8-bit BGR)
 
 ---
 
-## 🔧 문제 해결
+## 🔧 Troubleshooting
 
-### 카메라가 감지되지 않음
+### Camera not detected
 
 ```bash
-# USB 연결 확인
+# Check USB connection
 lsusb | grep -i intel
-# 결과: 8086:0b3a Intel Corp. 가 보여야 함
+# Output should show: 8086:0b3a Intel Corp.
 
-# USB 3.0 포트 확인
-# 카메라 접근 확인
+# Verify USB 3.0 port
+# Check camera access
 python3 00_check_camera.py
 ```
 
-### "Device or Resource Busy" 에러
+### "Device or Resource Busy" error
 
-**원인:** 카메라 리소스가 완전히 해제되지 않음
+**Cause:** Camera resource not fully released
 
-**해결:**
-1. 스크립트 종료 후 0.5초 대기 (자동 구현됨)
-2. 30프레임 안정화 후 캡처 (자동 구현됨)
-3. USB 재연결
+**Solution:**
+1. Wait 0.5s after script exit (auto-implemented)
+2. 30-frame warm-up before capture (auto-implemented)
+3. Reconnect USB
 
 ```bash
-# 프로세스 강제 종료 (필요시)
+# Force kill process (if needed)
 pkill -9 python3
 ```
 
-### "Network is unreachable" 에러
+### "Network is unreachable" error
 
-**원인:** Mac IP가 잘못되었거나 네트워크 연결 끊김
+**Cause:** Incorrect Mac IP or network disconnected
 
-**Mac에서 IP 확인:**
+**Check IP on Mac:**
 ```bash
-# 모든 네트워크 IP 확인
+# Show all network IPs
 ifconfig | grep "inet " | grep -v 127.0.0.1
 
-# 출력 예시:
-#   inet 10.40.100.105 netmask ...   <- WiFi (무선)
-#   inet 192.168.123.99 netmask ...   <- Ethernet (유선) ✅ 이거 사용!
-
+# Example output:
+#   inet 10.40.100.105 netmask ...   <- WiFi (wireless)
+#   inet 192.168.123.99 netmask ...   <- Ethernet (wired) ✅ Use this!
 ```
 
-**02_stream_sender.py 수정:**
+**Update 02_stream_sender.py:**
 ```python
-MAC_IP = "확인한_유선_IP"  # 예: "192.168.123.99"
+MAC_IP = "confirmed_wired_IP"  # e.g., "192.168.123.99"
 ```
 
-### WiFi 과부하로 연결 끊김
+### WiFi overload causing disconnection
 
-**원인:** RGB + Depth = ~6 MB/s 지속 전송, WiFi는 간섭/레이턴시에 취약
+**Cause:** RGB + Depth = ~6 MB/s sustained, WiFi vulnerable to interference/latency
 
-**해결: 유선 네트워크 사용**
+**Solution: Use wired network**
 
-**대체 방법 (유선 불가능한 경우):**
-1. **프레임률 낮추기:**
+**Alternatives (if wired unavailable):**
+1. **Lower frame rate:**
    ```python
    config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 15)  # 30 → 15
    ```
 
-2. **JPEG 품질 낮추기:**
+2. **Reduce JPEG quality:**
    ```python
    cv2.imencode('.jpg', color_image, [cv2.IMWRITE_JPEG_QUALITY, 70])  # 85 → 70
    ```
 
-3. **해상도 낮추기:**
+3. **Lower resolution:**
    ```python
    config.enable_stream(rs.stream.depth, 320, 240, ...)  # 640x480 → 320x240
    ```
 
-### 네트워크 연결 테스트
+### Test network connection
 
 ```bash
-# Mac에서 UDP 리스너 실행:
+# On Mac, run UDP listener:
 nc -ul 8889
 
-# Jetson에서 테스트 패킷 전송:
+# On Jetson, send test packet:
 echo "test" | nc -u 10.40.100.105 8889
 ```
 
 ---
 
-## 📚 참고 자료
+## 📚 References
 
-**vibes 프로젝트:**
-- `/home/unitree/unitree_g1_vibes/stream_realsense.py` - 풀 기능 로컬 뷰어
-- `/home/unitree/unitree_g1_vibes/jetson_realsense_stream.py` - GStreamer 스트리밍
-- `/home/unitree/unitree_g1_vibes/receive_realsense_gst.py` - GStreamer 수신기
+**vibes project:**
+- `/home/unitree/unitree_g1_vibes/stream_realsense.py` - Full-featured local viewer
+- `/home/unitree/unitree_g1_vibes/jetson_realsense_stream.py` - GStreamer streaming
+- `/home/unitree/unitree_g1_vibes/receive_realsense_gst.py` - GStreamer receiver
 
-**librealsense 예제:**
+**librealsense examples:**
 - `/home/unitree/unitree_g1_vibes/librealsense/wrappers/python/examples/`
 
-**프로젝트 패턴:**
+**Project pattern:**
 - LiDAR viewer: `/home/unitree/AIM/LiDAR/`
 
 ---
 
 ## 💡 TODO
 
-- [ ] H.264/H.265 코덱 도입 (WiFi 안정성 개선시 고려, 대역폭 6MB/s → 1-2MB/s)
-- [ ] GStreamer + NVENC 통합 (GPU 하드웨어 가속)
-- [ ] IMU 데이터 통합
-- [ ] 여러 카메라 동시 지원
+- [ ] Introduce H.264/H.265 codec (consider when WiFi stability improves, bandwidth 6MB/s → 1-2MB/s)
+- [ ] GStreamer + NVENC integration (GPU hardware acceleration)
+- [ ] IMU data integration
+- [ ] Multi-camera support
 
-**Note:** 현재 JPEG+PNG 방식으로 충분히 안정적. 코덱은 WiFi 끊김 문제 발생시에만 고려.
+**Note:** Current JPEG+PNG approach is sufficiently stable. Consider codec only if WiFi disconnection issues occur.
 
 ---
 

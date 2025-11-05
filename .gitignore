@@ -46,3 +46,6 @@ Thumbs.db
 .env
 audio/
 *.pt
+logs/
+
+jeffrey.py

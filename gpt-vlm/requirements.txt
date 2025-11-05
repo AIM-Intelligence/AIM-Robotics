@@ -1,0 +1,5 @@
+openai>=1.0.0
+pyrealsense2
+opencv-python
+numpy
+python-dotenv

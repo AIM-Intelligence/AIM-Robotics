@@ -1,0 +1,6 @@
+websockets
+python-dotenv
+pyalsaaudio
+pyrealsense2
+opencv-python
+numpy

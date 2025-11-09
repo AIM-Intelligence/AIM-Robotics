@@ -74,10 +74,10 @@ cd /home/unitree/AIM-Robotics/SLAM/lidar_tx
 Livox LiDAR Stream (v1)
 ========================================
 Initializing Livox SDK...
- LiDAR connected: Mid-360 (SN: 1234567890)
- Streaming to 127.0.0.1:9999
- Range filter: 0.1 - 15.0 m
- Downsampling: 1x (disabled)
+  LiDAR connected: Mid-360 (SN: 1234567890)
+  Streaming to 127.0.0.1:9999
+  Range filter: 0.1 - 15.0 m
+  Downsampling: 1x (disabled)
 
 [TX] Packets: 1054/s, Points: 105400/s, Bandwidth: 9.8 Mbit/s
 ```
@@ -115,7 +115,7 @@ Preset:           indoor (ICP tuning applied)
 Debug:            False
 ======================================================================
 
- UDP socket listening on 0.0.0.0:9999
+  UDP socket listening on 0.0.0.0:9999
 Listening for LiDAR packets... (Ctrl+C to stop)
 
 ======================================================================

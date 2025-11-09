@@ -20,6 +20,8 @@ Controls:
 import argparse
 import struct
 import time
+import sys
+import os
 import numpy as np
 
 try:
@@ -34,6 +36,23 @@ try:
 except ImportError:
     print("ERROR: Open3D not installed. Run: pip3 install open3d")
     exit(1)
+
+
+# Suppress Filament C++ stderr warnings globally (file descriptor level)
+class SuppressStderr:
+    def __enter__(self):
+        # Save original stderr file descriptor
+        self.original_stderr_fd = os.dup(2)
+        # Redirect stderr (fd 2) to /dev/null
+        devnull_fd = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull_fd, 2)
+        os.close(devnull_fd)
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # Restore original stderr
+        os.dup2(self.original_stderr_fd, 2)
+        os.close(self.original_stderr_fd)
 
 
 # Protocol constants
@@ -88,11 +107,12 @@ class SlamRealtimeViewer:
         self.pcd_mat.point_size = 2.0
 
         self.traj_mat = rendering.MaterialRecord()
-        self.traj_mat.shader = "defaultUnlit"
+        self.traj_mat.shader = "unlitLine"  # Use dedicated line shader
         self.traj_mat.line_width = 2.0
+        self.traj_mat.base_color = (0.0, 1.0, 0.0, 1.0)  # Green
 
         self.coord_mat = rendering.MaterialRecord()
-        self.coord_mat.shader = "defaultUnlit"
+        self.coord_mat.shader = "defaultLit"  # Use lit shader for mesh
 
         # Add geometries to scene
         self.scene.scene.add_geometry("pcd", self.pcd, self.pcd_mat)
@@ -161,11 +181,12 @@ class SlamRealtimeViewer:
             self.trajectory_line.points = o3d.utility.Vector3dVector(np.zeros((0, 3)))
             self.trajectory_line.lines = o3d.utility.Vector2iVector(np.zeros((0, 2)))
 
-            # Update scene
-            self.scene.scene.remove_geometry("pcd")
-            self.scene.scene.remove_geometry("trajectory")
-            self.scene.scene.add_geometry("pcd", self.pcd, self.pcd_mat)
-            self.scene.scene.add_geometry("trajectory", self.trajectory_line, self.traj_mat)
+            # Update scene (must remove/add to refresh)
+            with SuppressStderr():
+                self.scene.scene.remove_geometry("pcd")
+                self.scene.scene.remove_geometry("trajectory")
+                self.scene.scene.add_geometry("pcd", self.pcd, self.pcd_mat)
+                self.scene.scene.add_geometry("trajectory", self.trajectory_line, self.traj_mat)
 
             print("✓ Buffer cleared")
             return True
@@ -271,9 +292,10 @@ class SlamRealtimeViewer:
             colors = np.tile([0, 1, 0], (len(lines), 1))  # Green
             self.trajectory_line.colors = o3d.utility.Vector3dVector(colors)
 
-            # Update scene (name-based, stable)
-            self.scene.scene.remove_geometry("trajectory")
-            self.scene.scene.add_geometry("trajectory", self.trajectory_line, self.traj_mat)
+            # Update scene (must remove/add to refresh)
+            with SuppressStderr():
+                self.scene.scene.remove_geometry("trajectory")
+                self.scene.scene.add_geometry("trajectory", self.trajectory_line, self.traj_mat)
 
     def update_robot_frame(self, pose):
         """Update coordinate frame to follow robot position"""
@@ -286,13 +308,8 @@ class SlamRealtimeViewer:
         if self.args.flip_z:
             pose_flipped[2, 3] = -pose_flipped[2, 3]
 
-        # Create new coordinate frame at robot pose
-        coord_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.5)
-        coord_frame.transform(pose_flipped)
-
-        # Update scene
-        self.scene.scene.remove_geometry("coord")
-        self.scene.scene.add_geometry("coord", coord_frame, self.coord_mat)
+        # Update transform only (no need to recreate mesh)
+        self.scene.scene.set_geometry_transform("coord", pose_flipped.astype(np.float32))
 
     def update_visualization(self, frame):
         """Update point cloud buffer and visualization"""
@@ -313,9 +330,10 @@ class SlamRealtimeViewer:
         self.pcd.points = o3d.utility.Vector3dVector(pts_world.astype(np.float64))
         self.pcd.colors = o3d.utility.Vector3dVector(colors.astype(np.float64))
 
-        # Update scene (name-based, stable rendering)
-        self.scene.scene.remove_geometry("pcd")
-        self.scene.scene.add_geometry("pcd", self.pcd, self.pcd_mat)
+        # Update scene (must remove/add to refresh)
+        with SuppressStderr():
+            self.scene.scene.remove_geometry("pcd")
+            self.scene.scene.add_geometry("pcd", self.pcd, self.pcd_mat)
 
         # Update coordinate frame to follow robot
         self.update_robot_frame(pose)

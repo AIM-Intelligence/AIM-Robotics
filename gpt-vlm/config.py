@@ -23,7 +23,7 @@ REALSENSE_FPS = 30
 # ============================================================
 JPEG_QUALITY = 75  # 0-100, higher = better quality but more tokens
 ANALYSIS_FPS = 1  # How often to send frames to GPT (1-2 recommended)
-SEND_DEPTH_IMAGE = True  # Send depth image along with RGB (doubles token cost)
+SEND_DEPTH_IMAGE = False  # Send depth image along with RGB (doubles token cost)
 
 # ============================================================
 # Logging Settings

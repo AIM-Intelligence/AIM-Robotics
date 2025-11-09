@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Phase 1: Basic RealSense Frame Capture
-로컬 테스트용 - RGB와 Depth 프레임 캡처 및 분석
+For local testing - RGB and Depth frame capture and analysis
 """
 import pyrealsense2 as rs
 import numpy as np
@@ -12,13 +12,13 @@ print("=" * 60)
 print("RealSense D435i - Basic Frame Capture")
 print("=" * 60)
 
-# RealSense 초기화
+# RealSense initialization
 print("\n[1/5] Initializing RealSense...")
 try:
     pipeline = rs.pipeline()
     config = rs.config()
 
-    # 스트림 설정
+    # Stream configuration
     config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
     config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
 
@@ -29,12 +29,12 @@ except Exception as e:
     print(f"✗ Initialization failed: {e}")
     sys.exit(1)
 
-# 파이프라인 시작
+# Start pipeline
 print("\n[2/5] Starting pipeline...")
 try:
     profile = pipeline.start(config)
 
-    # 인트린식 파라미터 가져오기
+    # Get intrinsic parameters
     color_stream = profile.get_stream(rs.stream.color).as_video_stream_profile()
     intrinsics = color_stream.get_intrinsics()
 
@@ -47,13 +47,13 @@ except Exception as e:
     print(f"✗ Pipeline start failed: {e}")
     sys.exit(1)
 
-# 안정화를 위해 몇 프레임 건너뛰기
+# Skip frames for stabilization
 print("\n[3/5] Waiting for camera to stabilize...")
 for i in range(30):
     pipeline.wait_for_frames()
 print("  ✓ Camera stabilized (30 frames skipped)")
 
-# 프레임 캡처
+# Frame capture
 print("\n[4/5] Capturing frames...")
 try:
     frames = pipeline.wait_for_frames()
@@ -64,8 +64,8 @@ try:
     if not depth_frame or not color_frame:
         raise RuntimeError("Failed to capture frames")
 
-    # NumPy 배열로 변환
-    depth_image = np.asanyarray(depth_frame.get_data())  # uint16, mm 단위
+    # Convert to NumPy arrays
+    depth_image = np.asanyarray(depth_frame.get_data())  # uint16, in mm
     color_image = np.asanyarray(color_frame.get_data())  # uint8, BGR
 
     print(f"  ✓ Frames captured successfully")
@@ -77,11 +77,11 @@ except Exception as e:
     pipeline.stop()
     sys.exit(1)
 
-# 데이터 분석
+# Data analysis
 print("\n[5/5] Analyzing data...")
 
-# Depth 통계
-valid_depth = depth_image[depth_image > 0]  # 0은 무효값
+# Depth statistics
+valid_depth = depth_image[depth_image > 0]  # 0 is invalid
 if len(valid_depth) > 0:
     depth_min = np.min(valid_depth)
     depth_max = np.max(valid_depth)
@@ -129,9 +129,9 @@ for dy in range(-1, 2):
         row_values.append(f"{val:5d}")
     print("      " + "  ".join(row_values))
 
-# 정리
+# Cleanup
 pipeline.stop()
-time.sleep(0.5)  # 카메라 재초기화를 위한 대기
+time.sleep(0.5)  # Wait for camera reinitialization
 
 print("\n" + "=" * 60)
 print("✓ Capture and analysis complete!")

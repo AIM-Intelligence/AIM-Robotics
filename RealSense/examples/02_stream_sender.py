@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
 Phase 2: RealSense Network Streaming - Sender (Jetson)
-Jetson에서 RealSense 카메라 데이터를 Mac으로 UDP 전송
+UDP transmission of RealSense camera data from Jetson to Mac
 """
 import pyrealsense2 as rs
 import numpy as np
 import socket
-import pickle
 import time
 import sys
 import cv2
@@ -58,9 +57,9 @@ try:
     rgb_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     depth_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-    # Wi-Fi 인터페이스 바인딩
-    rgb_sock.bind(("10.40.100.143", 0))
-    depth_sock.bind(("10.40.100.143", 0))
+    # WiFi interface binding
+    rgb_sock.bind(("192.168.123.164", 0))
+    depth_sock.bind(("192.168.123.164", 0))
 
     # Increase buffer size for large frames
     rgb_sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 2 * 1024 * 1024)  # 2MB
@@ -145,7 +144,8 @@ try:
         try:
             # Encode RGB as JPEG (lossy compression, ~10-20x smaller)
             _, rgb_encoded = cv2.imencode('.jpg', color_image, [cv2.IMWRITE_JPEG_QUALITY, 85])
-            rgb_data = pickle.dumps(rgb_encoded, protocol=pickle.HIGHEST_PROTOCOL)
+            # Convert to raw bytes with size header (4 bytes)
+            rgb_data = struct.pack('!I', len(rgb_encoded)) + rgb_encoded.tobytes()
 
             # Send with chunking
             send_chunked_data(rgb_sock, rgb_data, MAC_IP, RGB_PORT, frame_count)
@@ -156,7 +156,8 @@ try:
         try:
             # Encode Depth as PNG (lossless compression for uint16)
             _, depth_encoded = cv2.imencode('.png', depth_image)
-            depth_data = pickle.dumps(depth_encoded, protocol=pickle.HIGHEST_PROTOCOL)
+            # Convert to raw bytes with size header (4 bytes)
+            depth_data = struct.pack('!I', len(depth_encoded)) + depth_encoded.tobytes()
 
             # Send with chunking
             send_chunked_data(depth_sock, depth_data, MAC_IP, DEPTH_PORT, frame_count)

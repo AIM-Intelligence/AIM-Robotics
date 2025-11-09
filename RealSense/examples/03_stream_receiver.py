@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """
 Phase 2: RealSense Network Streaming - Receiver (Mac)
-Mac에서 Jetson으로부터 RealSense 데이터를 수신하여 표시
+Receive and display RealSense data from Jetson on Mac
 """
 import socket
-import pickle
 import numpy as np
 import cv2
 import sys
@@ -88,7 +87,12 @@ def receive_rgb():
 
     for complete_data in receive_chunked_data(sock):
         try:
-            encoded_image = pickle.loads(complete_data)
+            # Extract size header and encoded data
+            size = struct.unpack('!I', complete_data[:4])[0]
+            encoded_bytes = complete_data[4:4+size]
+
+            # Convert bytes to numpy array
+            encoded_image = np.frombuffer(encoded_bytes, dtype=np.uint8)
 
             # Decode JPEG
             image = cv2.imdecode(encoded_image, cv2.IMREAD_COLOR)
@@ -114,7 +118,12 @@ def receive_depth():
 
     for complete_data in receive_chunked_data(sock):
         try:
-            encoded_image = pickle.loads(complete_data)
+            # Extract size header and encoded data
+            size = struct.unpack('!I', complete_data[:4])[0]
+            encoded_bytes = complete_data[4:4+size]
+
+            # Convert bytes to numpy array
+            encoded_image = np.frombuffer(encoded_bytes, dtype=np.uint8)
 
             # Decode PNG (preserves uint16)
             image = cv2.imdecode(encoded_image, cv2.IMREAD_UNCHANGED)

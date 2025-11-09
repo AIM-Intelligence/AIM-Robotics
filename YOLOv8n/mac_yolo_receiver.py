@@ -4,7 +4,6 @@ YOLOv8 + RealSense Network Streaming - Receiver (Mac)
 Receives and displays YOLO detection results from Jetson via UDP
 """
 import socket
-import pickle
 import numpy as np
 import cv2
 import sys
@@ -71,7 +70,12 @@ def receive_rgb():
 
     for complete_data in receive_chunked_data(sock):
         try:
-            encoded_image = pickle.loads(complete_data)
+            # Extract size header and encoded data
+            size = struct.unpack('!I', complete_data[:4])[0]
+            encoded_bytes = complete_data[4:4+size]
+
+            # Convert bytes to numpy array
+            encoded_image = np.frombuffer(encoded_bytes, dtype=np.uint8)
             image = cv2.imdecode(encoded_image, cv2.IMREAD_COLOR)
 
             with data_lock:

@@ -6,7 +6,6 @@ Real-time object detection with RealSense D435i, streaming to Mac via UDP
 import pyrealsense2 as rs
 import numpy as np
 import socket
-import pickle
 import time
 import sys
 import cv2
@@ -23,7 +22,7 @@ CHUNK_SIZE = 60000
 YOLO_MODEL = "yolov8n.pt"
 YOLO_CONF = 0.5
 
-JETSON_WIFI_IP = "10.40.100.128"
+JETSON_WIFI_IP = "192.168.123.164"  # eth0 IP (wired)
 REALSENSE_WIDTH = 640
 REALSENSE_HEIGHT = 480
 REALSENSE_FPS = 30
@@ -171,7 +170,8 @@ try:
         # Encode and send
         try:
             _, rgb_encoded = cv2.imencode('.jpg', annotated_image, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
-            rgb_data = pickle.dumps(rgb_encoded, protocol=pickle.HIGHEST_PROTOCOL)
+            # Convert to raw bytes with size header (4 bytes)
+            rgb_data = struct.pack('!I', len(rgb_encoded)) + rgb_encoded.tobytes()
             send_chunked_data(rgb_sock, rgb_data, MAC_IP, RGB_PORT, frame_count)
         except Exception as e:
             print(f"Warning: RGB send failed: {e}")

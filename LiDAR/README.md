@@ -11,9 +11,9 @@ Real-time 3D point cloud visualization for Livox Mid-360 LiDAR on Unitree G1 Hum
 
 | Step | Command |
 |------|---------|
-| ① Get Mac IP | `ifconfig \| grep "inet "` |
+| ① Get Mac IP | `ifconfig \| grep "inet " \| grep -v 127.0.0.1` |
 | ② Build on Jetson (first time only) | `./build_lidar.sh` |
-| ③ Start streaming on Jetson | `./build/g1_lidar_stream g1_mid360_config.json 10.40.100.105 8888` |
+| ③ Start streaming on Jetson | `./build/g1_lidar_stream g1_mid360_config.json 192.168.123.99 8888` |
 | ④ Start viewer on Mac | `python3 lidar_viewer.py` |
 
 ---

@@ -27,7 +27,7 @@ WARMUP_FRAMES = 30  # Number of frames to skip during camera warmup
 # ============================================================
 # Image Sending Configuration
 # ============================================================
-IMAGE_SEND_INTERVAL = 10.0  # Send image every N seconds
+IMAGE_SEND_INTERVAL = 5.0  # Send image every N seconds
 JPEG_QUALITY = 75  # JPEG compression quality (0-100)
 SEND_IMAGES = True  # Set to False to disable vision temporarily
 
@@ -50,7 +50,12 @@ SPEAKER_NAME_PATTERNS = ["V720", "Fenda", "USB", "Speaker", "Headphones"]
 # ============================================================
 # System Prompt
 # ============================================================
-SYSTEM_PROMPT_NAME = "MULTIMODAL_KR"  # Change to desired prompt from prompts.py
+# For g1_realtime_multimodal_tool.py (with autonomous arm control):
+# SYSTEM_PROMPT_NAME = "G1_AUTONOMOUS_ARM_KR"  # 자율 팔 제어 (한국어)
+# SYSTEM_PROMPT_NAME = "G1_AUTONOMOUS_ARM"     # Autonomous arm control (English)
+
+# For g1_realtime_multimodal.py (vision only):
+SYSTEM_PROMPT_NAME = "G1_AUTONOMOUS_ARM_KR"  # Change to desired prompt from prompts.py
 
 # ============================================================
 # Cost Tracking

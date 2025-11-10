@@ -1,23 +1,29 @@
 #!/usr/bin/env python3
 """
-G1 Realtime Multimodal (Voice + Vision)
+G1 Realtime Multimodal with Autonomous Arm Control
+- Voice + Vision + Arm Control
 - USB mic/speaker (24kHz S16_LE mono)
-- Realtime API server VAD (no manual commit)
-- Hardware playback wait via /proc/asound before re-enabling mic
-- Periodically inject latest RealSense frame as conversation item (no auto response)
+- Realtime API server VAD + Function Calling
+- AI autonomously decides when to use arm gestures based on conversation and vision
 
 Tested with:
 - Mic: ABKO N550
 - Speaker: Fenda V720
 - Camera: RealSense D435(i)
+- Robot: Unitree G1
 """
 
-import os, asyncio, json, base64, time, subprocess, re, glob
+import os, asyncio, json, base64, time, subprocess, re, glob, sys
 import websockets
 import queue
 import cv2
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
+
+# ---- Unitree SDK ----
+sys.path.insert(0, '/home/unitree/unitree_sdk2_python')
+from unitree_sdk2py.core.channel import ChannelFactoryInitialize
+from unitree_sdk2py.g1.arm.g1_arm_action_client import G1ArmActionClient
 
 # ---- Optional: RealSense ----
 try:
@@ -62,8 +68,35 @@ WARMUP_FRAMES = config.WARMUP_FRAMES
 MIC_NAME_PATTERNS     = config.MIC_NAME_PATTERNS
 SPEAKER_NAME_PATTERNS = config.SPEAKER_NAME_PATTERNS
 
-# System prompt
-SYSTEM_PROMPT = prompts.get_prompt(config.SYSTEM_PROMPT_NAME)
+# System prompt (override for autonomous arm control)
+SYSTEM_PROMPT = prompts.get_prompt("G1_AUTONOMOUS_ARM")  # 자율 팔 제어용
+
+# ================== Arm Control ==================
+ARM_ACTIONS = {
+    "wave": 26,
+    "high wave": 26,
+    "high five": 18,
+    "heart": 20,
+    "right heart": 21,
+    "clap": 17,
+    "hug": 19,
+    "hands up": 15,
+    "shake": 27,
+    "shake hand": 27,
+    "face wave": 25,
+    "reject": 22,
+    "no": 22,
+    "kiss": 11,
+    "two-hand kiss": 11,
+    "left kiss": 12,
+    "right kiss": 13,
+    "x-ray": 24,
+    "xray": 24,
+    "release": 99,
+}
+
+# Global arm client (initialized in main)
+g1_arm_client = None
 
 # ================== Helpers ==================
 def find_usb_audio_device(patterns, device_type="input"):
@@ -102,6 +135,63 @@ def speaker_is_playing(card_num: str, dev_num: str) -> bool:
             pass
     return False
 
+def control_g1_arm_sync(gesture: str, action_id: int):
+    """Synchronous arm control (runs in background thread)"""
+    global g1_arm_client
+
+    try:
+        result = g1_arm_client.ExecuteAction(action_id)
+
+        if result == 0:
+            print(f"✅ Arm gesture '{gesture}' executed")
+
+            # Auto release after action (like gpt-vlm)
+            if action_id != 99:  # Don't release after release command
+                time.sleep(0.5)  # Wait for gesture to complete
+                print("🔓 Auto releasing arm...")
+                release_result = g1_arm_client.ExecuteAction(99)
+
+                if release_result == 0:
+                    print("✅ Arm released")
+                else:
+                    print(f"⚠️  Release failed: {release_result}")
+        else:
+            print(f"❌ Arm control failed: {result}")
+    except Exception as e:
+        print(f"❌ Arm control exception: {e}")
+
+def control_g1_arm(gesture: str) -> dict:
+    """Execute G1 arm gesture (non-blocking)"""
+    global g1_arm_client
+
+    gesture_lower = gesture.lower()
+    if gesture_lower not in ARM_ACTIONS:
+        return {
+            "success": False,
+            "error": f"Unknown gesture: {gesture}. Available: {list(ARM_ACTIONS.keys())}"
+        }
+
+    if g1_arm_client is None:
+        return {
+            "success": False,
+            "error": "Arm client not initialized"
+        }
+
+    action_id = ARM_ACTIONS[gesture_lower]
+    print(f"\n🦾 Starting arm gesture: {gesture} (ID: {action_id})")
+
+    # Execute in background thread (non-blocking)
+    import threading
+    thread = threading.Thread(target=control_g1_arm_sync, args=(gesture, action_id), daemon=True)
+    thread.start()
+
+    # Return immediately so AI can speak
+    return {
+        "success": True,
+        "gesture": gesture,
+        "message": f"Performing {gesture}"
+    }
+
 def encode_bgr_to_data_url(bgr: np.ndarray) -> str:
     ok, buf = cv2.imencode(".jpg", bgr, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
     if not ok:
@@ -131,7 +221,22 @@ def init_realsense():
 
 # ================== Main ==================
 async def main():
+    global g1_arm_client
+
     assert OPENAI_API_KEY, "❌ Set OPENAI_API_KEY in .env"
+
+    # Initialize G1 Arm Client
+    print("🦾 Initializing G1 Arm Client...")
+    try:
+        ChannelFactoryInitialize(0, 'eth0')
+        g1_arm_client = G1ArmActionClient()
+        g1_arm_client.SetTimeout(10.0)
+        g1_arm_client.Init()
+        print("✅ G1 Arm Client ready")
+    except Exception as e:
+        print(f"⚠️  Arm client init failed: {e}")
+        print("   Continuing without arm control...")
+        g1_arm_client = None
 
     mic_device, mic_card, mic_dev = find_usb_audio_device(MIC_NAME_PATTERNS, "input")
     spk_device, spk_card, spk_dev = find_usb_audio_device(SPEAKER_NAME_PATTERNS, "output")
@@ -182,7 +287,7 @@ async def main():
         async with websockets.connect(url, extra_headers=headers, ping_timeout=10, close_timeout=5) as ws:
             print("✅ Realtime connected")
 
-            # Session: server VAD (auto commit), audio in/out, voice, system prompt
+            # Session: server VAD (auto commit), audio in/out, voice, system prompt, function calling
             await ws.send(json.dumps({
                 "type": "session.update",
                 "session": {
@@ -198,7 +303,26 @@ async def main():
                         "prefix_padding_ms": 300,
                         "silence_duration_ms": 500,
                         # create_response default true → let server auto-commit & respond
-                    }
+                    },
+                    "tools": [
+                        {
+                            "type": "function",
+                            "name": "control_g1_arm",
+                            "description": "IMPORTANT: This function makes the robot perform a gesture. After calling this function, you MUST also provide a voice response. Do NOT just call the function and stay silent. Always combine gesture with speech. Example: User says 'hello' → call control_g1_arm('wave') AND say 'Hello! Nice to meet you!'",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "gesture": {
+                                        "type": "string",
+                                        "enum": list(ARM_ACTIONS.keys()),
+                                        "description": "The gesture to perform (wave, clap, heart, high five, etc)"
+                                    }
+                                },
+                                "required": ["gesture"]
+                            }
+                        }
+                    ],
+                    "tool_choice": "auto"
                 }
             }))
             print("⚙️  Session configured")
@@ -363,6 +487,12 @@ async def main():
 
             async def receiver():
                 nonlocal mic_enabled, prebuffered, playing, speaker
+
+                # Track audio in current response
+                response_has_audio = False
+                response_has_function_call = False
+                response_completed = False  # Track if we already handled response.done
+
                 while is_running:
                     try:
                         msg = json.loads(await ws.recv())
@@ -373,6 +503,9 @@ async def main():
                             buffer_audio.clear()
                             prebuffered = False
                             playing = False
+                            response_has_audio = False
+                            response_has_function_call = False
+                            response_completed = False
                             try:
                                 speaker.close()
                             except Exception:
@@ -388,8 +521,25 @@ async def main():
                             b64 = msg.get("delta") or msg.get("audio") or ""
                             if b64:
                                 buffer_audio.extend(base64.b64decode(b64))
+                                response_has_audio = True  # Mark that we received audio
 
-                        elif t in ("response.output_audio.done", "response.done"):
+                        elif t == "response.done":
+                            # Only handle once per response
+                            if response_completed:
+                                continue
+                            response_completed = True
+
+                            # Check if this response had audio
+                            if not response_has_audio and response_has_function_call:
+                                # Function-only response with no audio → don't unmute mic yet
+                                # The AI will generate speech in the next response
+                                print("🔧 Function-only response, waiting for speech...")
+                                # Reset flags for next response
+                                response_has_audio = False
+                                response_has_function_call = False
+                                continue
+
+                            # Normal response with audio - proceed with playback wait
                             # 1) drain python buffer
                             while len(buffer_audio) > 0:
                                 await asyncio.sleep(0.01)
@@ -410,6 +560,8 @@ async def main():
                             playing = False
                             prebuffered = False
                             mic_enabled = True
+                            response_has_audio = False
+                            response_has_function_call = False
                             print("🔊 Mic enabled")
 
                         elif t == "input_audio_buffer.speech_started":
@@ -437,6 +589,43 @@ async def main():
 
                         elif t == "conversation.item.input_audio_transcription.completed":
                             print(f"👤 You: {msg.get('transcript','')}")
+
+                        elif t == "response.function_call_arguments.done":
+                            # Function call completed
+                            call_id = msg.get("call_id")
+                            func_name = msg.get("name")
+                            args_str = msg.get("arguments", "{}")
+
+                            print(f"\n🔧 Function call: {func_name}")
+                            response_has_function_call = True  # Mark that function was called
+
+                            try:
+                                args = json.loads(args_str)
+                            except:
+                                args = {}
+
+                            # Execute function
+                            if func_name == "control_g1_arm":
+                                gesture = args.get("gesture", "")
+                                result = control_g1_arm(gesture)  # Non-blocking call with auto-release
+
+                                # Send result back to API
+                                await ws.send(json.dumps({
+                                    "type": "conversation.item.create",
+                                    "item": {
+                                        "type": "function_call_output",
+                                        "call_id": call_id,
+                                        "output": json.dumps(result)
+                                    }
+                                }))
+
+                                # Trigger follow-up response for speech
+                                await ws.send(json.dumps({
+                                    "type": "response.create"
+                                }))
+
+                            else:
+                                print(f"⚠️  Unknown function: {func_name}")
 
                         elif t == "error":
                             print(f"❌ Error: {msg.get('error',{}).get('message','Unknown')}")

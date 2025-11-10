@@ -12,11 +12,13 @@ OpenAI Realtime API를 사용한 Unitree G1 음성 + 비전 통합 시스템
 
 ```
 gpt-multimodal/
-├── g1_realtime_multimodal.py  # 메인 스크립트
-├── config.py                   # 설정 (카메라, 오디오 등)
-├── prompts.py                  # 시스템 프롬프트
-├── requirements.txt            # 의존성
-└── README.md                   # 이 파일
+├── g1_realtime_multimodal.py          # 기본 멀티모달 스크립트 (음성+시각)
+├── g1_realtime_multimodal_tool.py     # 팔 제어 기능 추가 (음성 명령)
+├── g1_realtime_multimodal_tool_v2.py  # 자율 시각 반응 (명령 없이 제스처 인식)
+├── config.py                           # 설정 (카메라, 오디오 등)
+├── prompts.py                          # 시스템 프롬프트
+├── requirements.txt                    # 의존성
+└── README.md                           # 이 파일
 ```
 
 ## 🔧 설치
@@ -118,9 +120,27 @@ SEND_IMAGES = False  # True로 설정하면 카메라 사용
 
 ## 🚀 실행
 
+### 버전별 실행 방법
+
+**기본 멀티모달 (음성+시각)**
 ```bash
 python3 g1_realtime_multimodal.py
 ```
+
+**팔 제어 + 음성 명령**
+```bash
+python3 g1_realtime_multimodal_tool.py
+```
+- 음성 명령으로 제스처 실행 ("안녕!", "사랑해" 등)
+- AI가 대화 맥락에서 자율적으로 제스처 판단
+
+**자율 시각 반응 (V2) - NEW!**
+```bash
+python3 g1_realtime_multimodal_tool_v2.py
+```
+- 음성 명령 없이 시각 정보만으로 자율 반응
+- 매우 확실한 제스처만 인식 (악수, 하트, 인사 등)
+- 애매한 상황에서는 침묵
 
 ## 💡 사용 팁
 
@@ -221,6 +241,20 @@ SPEAKER_CHUNK_FRAMES = 1200  # 50ms
 - **프롬프트**: `MULTIMODAL_KR` 또는 `G1_VISION_ROBOT_KR`
 
 ## 🔄 업데이트 내역
+
+### v2.0.0 (2025-01-10)
+- **NEW**: 자율 시각 반응 모드 추가 (g1_realtime_multimodal_tool_v2.py)
+  - 음성 명령 없이 시각 정보만으로 제스처 인식
+  - 매우 확실한 상황에서만 자율 반응
+  - 제스처 + 음성 동시 실행 문제 해결
+- 마이크 재오픈 버그 수정 (response.done 중복 처리)
+- 시스템 프롬프트 개선 (영어/한국어 통일)
+
+### v1.1.0 (2025-01-10)
+- G1 팔 제어 기능 추가 (g1_realtime_multimodal_tool.py)
+- Function calling 기반 제스처 실행
+- 자동 release 기능 (0.5초 후)
+- 비블로킹 제스처 실행
 
 ### v1.0.0 (2025-01-10)
 - 초기 릴리스
